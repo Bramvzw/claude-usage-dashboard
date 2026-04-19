@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Code Usage Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
+  <script src="./dashboard-data.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; padding: 24px; }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; color: #f0f3f6; }
+    .subtitle { color: #7d8590; font-size: 0.85rem; margin-bottom: 24px; }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
+    .card-label { font-size: 0.75rem; color: #7d8590; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .card-value { font-size: 1.8rem; font-weight: 700; color: #f0f3f6; }
+    .card-detail { font-size: 0.8rem; color: #7d8590; margin-top: 4px; }
+
+    .chart-container { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+    .chart-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: #f0f3f6; }
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+
+    .comparison { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 24px; display: none; }
+    .comp-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; padding: 16px 0; }
+    .comp-row + .comp-row { border-top: 1px solid #21262d; }
+    .comp-col { text-align: center; }
+    .comp-label { font-size: 0.75rem; color: #7d8590; text-transform: uppercase; margin-bottom: 4px; }
+    .comp-value { font-size: 1.4rem; font-weight: 700; }
+    .comp-arrow { font-size: 1.5rem; }
+    .comp-change { font-size: 0.9rem; font-weight: 600; }
+    .positive { color: #3fb950; }
+    .negative { color: #f85149; }
+
+    .filters { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+    .filters select, .filters input { background: #0d1117; border: 1px solid #30363d; color: #e1e4e8; padding: 6px 10px; border-radius: 6px; font-size: 0.85rem; }
+    .filters label { font-size: 0.8rem; color: #7d8590; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #30363d; color: #7d8590; font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+    thead th:hover { color: #f0f3f6; }
+    thead th.sorted::after { content: ' \u25BC'; }
+    thead th.sorted.asc::after { content: ' \u25B2'; }
+    tbody td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+    tbody tr:hover { background: #1c2128; }
+    .prompt-text { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c9d1d9; }
+    .model-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+    .model-opus { background: #2d1b4e; color: #d2a8ff; }
+    .model-opus47 { background: #4e1b3a; color: #ff9ec3; }
+    .model-sonnet { background: #1b3a4e; color: #79c0ff; }
+    .model-haiku { background: #1b4e2d; color: #7ee787; }
+    .token-num { font-variant-numeric: tabular-nums; text-align: right; }
+
+    .pagination { display: flex; gap: 8px; margin-top: 16px; justify-content: center; align-items: center; }
+    .pagination button { background: #21262d; border: 1px solid #30363d; color: #e1e4e8; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+    .pagination button:hover { background: #30363d; }
+    .pagination button:disabled { opacity: 0.4; cursor: default; }
+    .pagination .page-info { font-size: 0.85rem; color: #7d8590; }
+
+    .loading { text-align: center; padding: 60px; color: #7d8590; }
+
+    .plugin-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+    .plugin-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 0.85rem; border: 1px solid; }
+    .plugin-active { background: #0d1f0d; border-color: #3fb950; }
+    .plugin-inactive { background: #161b22; border-color: #30363d; color: #7d8590; }
+    .plugin-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .plugin-active .plugin-dot { background: #3fb950; animation: pulse-green 2s ease-in-out infinite; }
+    @keyframes pulse-green {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.6); }
+      50% { box-shadow: 0 0 8px 4px rgba(63, 185, 80, 0.25); }
+    }
+    .plugin-inactive .plugin-dot { background: #484f58; }
+    .plugin-desc { font-size: 0.75rem; color: #7d8590; }
+    .section-header { margin-bottom: 8px; margin-top: 32px; }
+    .section-header h2 { font-size: 1.1rem; color: #7d8590; font-weight: 400; }
+
+    .advice-item { padding: 12px 16px; margin-bottom: 8px; border-radius: 6px; border-left: 3px solid; }
+    .advice-positive { background: #0d1f0d; border-color: #3fb950; }
+    .advice-warning { background: #1f1d0d; border-color: #d29922; }
+    .advice-negative { background: #1f0d0d; border-color: #f85149; }
+    .advice-info { background: #0d1117; border-color: #79c0ff; }
+    .advice-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600; }
+    .advice-positive .advice-label { color: #3fb950; }
+    .advice-warning .advice-label { color: #d29922; }
+    .advice-negative .advice-label { color: #f85149; }
+    .advice-info .advice-label { color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <h1>Claude Code Usage Dashboard</h1>
+  <div class="subtitle" id="subtitle">Laden...</div>
+
+  <!-- SECTIE 1: Overzicht & Plugins -->
+  <div class="cards" id="cards"></div>
+  <div class="chart-container" id="pluginStatus" style="margin-bottom:24px;">
+    <div class="chart-title">Actieve Plugins</div>
+    <div id="pluginContent"></div>
+  </div>
+
+  <!-- SECTIE 2: Advies (bovenaan, zodat je meteen ziet wat je moet doen) -->
+  <div class="chart-container" id="adviceSection">
+    <div class="chart-title">Advies & Suggesties</div>
+    <div id="adviceContent" style="font-size:0.9rem;line-height:1.6;"></div>
+  </div>
+
+  <!-- SECTIE 3: Voor/Na vergelijking (als er markers zijn) -->
+  <div class="comparison" id="comparison">
+    <div class="chart-title">Voor/Na Plugin Vergelijking</div>
+    <div class="comparison-grid" id="compGrid"></div>
+  </div>
+
+  <!-- SECTIE 4: Kosten & Verbruik -->
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Kosten & Verbruik</h2></div>
+  <div class="chart-row">
+    <div class="chart-container">
+      <div class="chart-title">Dagelijks tokenverbruik per model</div>
+      <canvas id="dailyChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">Effectieve tokens per prompt</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Zonder cache reads — dit zijn je werkelijke kosten.</div>
+      <canvas id="avgChart"></canvas>
+    </div>
+  </div>
+
+  <!-- SECTIE 5: Kwaliteit & Effectiviteit -->
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Kwaliteit & Effectiviteit</h2></div>
+  <div class="chart-row">
+    <div class="chart-container">
+      <div class="chart-title">Output per request</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Hoeveel het model produceert per beurt. Daling na plugin = mogelijk minder nuttig.</div>
+      <canvas id="outputPerRequestChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">API calls per user prompt</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Meer calls = meer tool-gebruik of retries. Stijging na plugin = minder efficiënt.</div>
+      <canvas id="requestsPerPromptChart"></canvas>
+    </div>
+  </div>
+
+  <!-- SECTIE 6: Cache & Plugin-effect -->
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Cache & Plugin-effect</h2></div>
+  <div class="chart-row">
+    <div class="chart-container">
+      <div class="chart-title">Cache hit ratio per dag</div>
+      <canvas id="cacheChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">Cache creation ratio per model</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">% input dat nieuw is. Lager = plugins werken beter.</div>
+      <canvas id="cacheCreationChart"></canvas>
+    </div>
+  </div>
+
+  <!-- SECTIE 7: Normalisatie (appels-met-appels) -->
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Genormaliseerde Vergelijking</h2></div>
+  <div class="chart-container">
+    <div class="chart-title">Gem. tokens per prompt per model</div>
+    <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Vergelijkt appels met appels — zelfde model, andere dag. Daling = echte besparing.</div>
+    <canvas id="normalizedAvgChart"></canvas>
+  </div>
+  <div class="chart-row">
+    <div class="chart-container">
+      <div class="chart-title">Model verdeling</div>
+      <canvas id="modelChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="chart-title">Model-mix per dag</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Controle: als model-mix verandert, kan dat token-verschil verklaren i.p.v. plugins.</div>
+      <canvas id="modelMixChart"></canvas>
+    </div>
+  </div>
+
+  <!-- SECTIE 8: Alle prompts -->
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Alle Prompts</h2></div>
+  <div class="chart-container">
+    <div class="filters">
+      <label>Model: <select id="filterModel"><option value="">Alle</option></select></label>
+      <label>Van: <input type="date" id="filterFrom"></label>
+      <label>Tot: <input type="date" id="filterTo"></label>
+      <label>Zoek: <input type="text" id="filterSearch" placeholder="Zoek in prompt..."></label>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="timestamp">Datum/Tijd</th>
+          <th data-sort="promptPreview">Prompt</th>
+          <th data-sort="model">Model</th>
+          <th data-sort="inputTokens" class="token-num">Input</th>
+          <th data-sort="outputTokens" class="token-num">Output</th>
+          <th data-sort="cacheReadTokens" class="token-num">Cache Read</th>
+          <th data-sort="cacheCreationTokens" class="token-num">Cache Create</th>
+          <th data-sort="totalTokens" class="token-num">Totaal</th>
+        </tr>
+      </thead>
+      <tbody id="promptTable"></tbody>
+    </table>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <script>
+    const PAGE_SIZE = 50;
+    let data = null;
+    let filteredPrompts = [];
+    let currentPage = 0;
+    let sortField = 'timestamp';
+    let sortAsc = false;
+
+    async function loadData() {
+      if (window.__DASHBOARD_DATA__) {
+        data = window.__DASHBOARD_DATA__;
+        render();
+        return;
+      }
+      try {
+        const resp = await fetch('./dashboard-data.json');
+        data = await resp.json();
+        render();
+      } catch (e) {
+        document.getElementById('subtitle').textContent = 'Fout bij laden van data. Run eerst: node parse-usage.mjs';
+      }
+    }
+
+    function fmt(n) {
+      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+      if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+      return n.toString();
+    }
+
+    function pct(n) { return (n * 100).toFixed(1) + '%'; }
+
+    function modelClass(model) {
+      if (model?.includes('opus-4-7')) return 'model-opus47';
+      if (model?.includes('opus')) return 'model-opus';
+      if (model?.includes('sonnet')) return 'model-sonnet';
+      if (model?.includes('haiku')) return 'model-haiku';
+      return '';
+    }
+
+    function modelShort(model) {
+      if (model?.includes('opus-4-7')) return 'Opus 4.7';
+      if (model?.includes('opus-4-6')) return 'Opus 4.6';
+      if (model?.includes('sonnet')) return 'Sonnet 4.6';
+      if (model?.includes('haiku')) return 'Haiku 4.5';
+      return model || 'Unknown';
+    }
+
+    function render() {
+      const gen = new Date(data.generated);
+      document.getElementById('subtitle').textContent =
+        `Gegenereerd: ${gen.toLocaleString('nl-NL')} | ${data.totalPrompts} requests | ${data.totalSessions} sessies`;
+
+      renderCards();
+      renderPlugins();
+      renderDailyChart();
+      renderAvgChart();
+      renderModelChart();
+      renderCacheChart();
+      renderNormalizedAvgChart();
+      renderCacheCreationChart();
+      renderModelMixChart();
+      renderOutputPerRequestChart();
+      renderRequestsPerPromptChart();
+      renderAdvice();
+      renderComparison();
+      populateFilters();
+      applyFilters();
+    }
+
+    function renderCards() {
+      const totalTokens = data.prompts.reduce((s, p) => s + p.totalTokens, 0);
+      const totalOutput = data.prompts.reduce((s, p) => s + p.outputTokens, 0);
+      const totalCacheRead = data.prompts.reduce((s, p) => s + p.cacheReadTokens, 0);
+      const totalCacheCreate = data.prompts.reduce((s, p) => s + p.cacheCreationTokens, 0);
+      const totalInput = data.prompts.reduce((s, p) => s + p.inputTokens, 0);
+      const avgPerPrompt = data.prompts.length > 0 ? Math.round(totalTokens / data.prompts.length) : 0;
+      const cacheRatio = totalCacheRead / (totalCacheRead + totalCacheCreate + totalInput) || 0;
+      const effectivePerPrompt = data.prompts.length > 0 ? Math.round((totalInput + totalOutput + totalCacheCreate) / data.prompts.length) : 0;
+      const effectiveTotal = totalInput + totalOutput + totalCacheCreate;
+
+      document.getElementById('cards').innerHTML = `
+        <div class="card">
+          <div class="card-label">Effectieve tokens/prompt</div>
+          <div class="card-value">${fmt(effectivePerPrompt)}</div>
+          <div class="card-detail">Zonder cache reads — dit telt</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Totaal effectief</div>
+          <div class="card-value">${fmt(effectiveTotal)}</div>
+          <div class="card-detail">Input ${fmt(totalInput)} + Output ${fmt(totalOutput)} + Cache create ${fmt(totalCacheCreate)}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Cache hit ratio</div>
+          <div class="card-value">${pct(cacheRatio)}</div>
+          <div class="card-detail">Read: ${fmt(totalCacheRead)} (90% goedkoper)</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Totaal incl. cache</div>
+          <div class="card-value">${fmt(totalTokens)}</div>
+          <div class="card-detail">${data.totalPrompts} requests | ${data.totalSessions} sessies | ${data.dailyAggregates.length} dagen</div>
+        </div>
+      `;
+    }
+
+    function renderPlugins() {
+      const plugins = data.plugins || [];
+      if (plugins.length === 0) {
+        document.getElementById('pluginContent').innerHTML = '<div style="color:#7d8590;font-size:0.85rem;">Geen plugins gedetecteerd. Installeer plugins om token-gebruik te optimaliseren.</div>';
+        return;
+      }
+      document.getElementById('pluginContent').innerHTML = `
+        <div class="plugin-grid">
+          ${plugins.map(p => `
+            <div class="plugin-badge ${p.active ? 'plugin-active' : 'plugin-inactive'}">
+              <span class="plugin-dot"></span>
+              <div>
+                <div>${p.name}</div>
+                <div class="plugin-desc">${p.description}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function markerAnnotations() {
+      if (!data.markers?.length) return {};
+      const annotations = {};
+      data.markers.forEach((m, i) => {
+        annotations[`marker${i}`] = {
+          type: 'line',
+          xMin: m.date,
+          xMax: m.date,
+          borderColor: '#f0883e',
+          borderWidth: 2,
+          borderDash: [6, 3],
+          label: {
+            display: true,
+            content: m.label,
+            position: 'start',
+            backgroundColor: '#f0883e',
+            color: '#fff',
+            font: { size: 11 },
+          },
+        };
+      });
+      return annotations;
+    }
+
+    function renderDailyChart() {
+      const days = data.dailyAggregates;
+      const models = [...new Set(days.flatMap(d => Object.keys(d.byModel)))];
+      const colors = { opus47: '#ff9ec3', opus: '#d2a8ff', sonnet: '#79c0ff', haiku: '#7ee787' };
+
+      const datasets = models.map(m => {
+        const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
+        return {
+          label: modelShort(m),
+          data: days.map(d => (d.byModel[m] || 0) / 1_000_000),
+          backgroundColor: colors[colorKey] + '80',
+          borderColor: colors[colorKey],
+          borderWidth: 1,
+        };
+      });
+
+      new Chart(document.getElementById('dailyChart'), {
+        type: 'bar',
+        data: { labels: days.map(d => d.date), datasets },
+        options: {
+          responsive: true,
+          scales: {
+            x: { stacked: true, ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { stacked: true, ticks: { color: '#7d8590', callback: v => v + 'M' }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderAvgChart() {
+      const days = data.dailyAggregates;
+      new Chart(document.getElementById('avgChart'), {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.date),
+          datasets: [{
+            label: 'Effectief (input+output+cache create)',
+            data: days.map(d => d.promptCount > 0 ? Math.round((d.inputTokens + d.outputTokens + d.cacheCreationTokens) / d.promptCount) : 0),
+            borderColor: '#f0883e',
+            backgroundColor: '#f0883e20',
+            fill: true,
+            tension: 0.3,
+          }, {
+            label: 'Totaal (incl. cache reads)',
+            data: days.map(d => d.avgTokensPerPrompt),
+            borderColor: '#7d859080',
+            borderDash: [5, 3],
+            tension: 0.3,
+            pointRadius: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { ticks: { color: '#7d8590', callback: v => fmt(v) }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderModelChart() {
+      const modelTotals = {};
+      data.prompts.forEach(p => {
+        const m = modelShort(p.model);
+        modelTotals[m] = (modelTotals[m] || 0) + p.totalTokens;
+      });
+      const labels = Object.keys(modelTotals);
+      const values = Object.values(modelTotals);
+      const bgColors = labels.map(l => l.includes('Opus 4.7') ? '#ff9ec3' : l.includes('Opus') ? '#d2a8ff' : l.includes('Sonnet') ? '#79c0ff' : '#7ee787');
+
+      new Chart(document.getElementById('modelChart'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: values, backgroundColor: bgColors }] },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#e1e4e8' } },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.raw)}` } },
+          },
+        },
+      });
+    }
+
+    function renderCacheChart() {
+      const days = data.dailyAggregates;
+      new Chart(document.getElementById('cacheChart'), {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.date),
+          datasets: [{
+            label: 'Cache hit ratio',
+            data: days.map(d => d.cacheHitRatio * 100),
+            borderColor: '#3fb950',
+            backgroundColor: '#3fb95020',
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderNormalizedAvgChart() {
+      const days = data.dailyAggregates;
+      const allModels = [...new Set(days.flatMap(d => Object.keys(d.modelStats || {})))];
+      const colors = { opus47: '#ff9ec3', opus: '#d2a8ff', sonnet: '#79c0ff', haiku: '#7ee787' };
+
+      const datasets = allModels.map(m => {
+        const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
+        return {
+          label: modelShort(m),
+          data: days.map(d => d.modelStats?.[m]?.avgTokensPerPrompt || null),
+          borderColor: colors[colorKey],
+          backgroundColor: colors[colorKey] + '20',
+          tension: 0.3,
+          spanGaps: true,
+          pointRadius: 4,
+        };
+      });
+
+      new Chart(document.getElementById('normalizedAvgChart'), {
+        type: 'line',
+        data: { labels: days.map(d => d.date), datasets },
+        options: {
+          responsive: true,
+          scales: {
+            x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { ticks: { color: '#7d8590', callback: v => fmt(v) }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderCacheCreationChart() {
+      const days = data.dailyAggregates;
+      const allModels = [...new Set(days.flatMap(d => Object.keys(d.modelStats || {})))];
+      const colors = { opus47: '#ff9ec3', opus: '#d2a8ff', sonnet: '#79c0ff', haiku: '#7ee787' };
+
+      const datasets = allModels.map(m => {
+        const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
+        return {
+          label: modelShort(m),
+          data: days.map(d => {
+            const ms = d.modelStats?.[m];
+            if (!ms || ms.promptCount === 0) return null;
+            return ms.cacheCreationRatio * 100;
+          }),
+          borderColor: colors[colorKey],
+          backgroundColor: colors[colorKey] + '20',
+          tension: 0.3,
+          spanGaps: true,
+          pointRadius: 4,
+        };
+      });
+
+      new Chart(document.getElementById('cacheCreationChart'), {
+        type: 'line',
+        data: { labels: days.map(d => d.date), datasets },
+        options: {
+          responsive: true,
+          scales: {
+            x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderModelMixChart() {
+      const days = data.dailyAggregates;
+      const allModels = [...new Set(days.flatMap(d => Object.keys(d.modelStats || {})))];
+      const colors = { opus47: '#ff9ec3', opus: '#d2a8ff', sonnet: '#79c0ff', haiku: '#7ee787' };
+
+      const datasets = allModels.map(m => {
+        const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
+        return {
+          label: modelShort(m),
+          data: days.map(d => {
+            const ms = d.modelStats?.[m];
+            if (!ms) return 0;
+            return Math.round((ms.promptCount / d.promptCount) * 100);
+          }),
+          backgroundColor: colors[colorKey] + '80',
+          borderColor: colors[colorKey],
+          borderWidth: 1,
+        };
+      });
+
+      new Chart(document.getElementById('modelMixChart'), {
+        type: 'bar',
+        data: { labels: days.map(d => d.date), datasets },
+        options: {
+          responsive: true,
+          scales: {
+            x: { stacked: true, ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { stacked: true, min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderOutputPerRequestChart() {
+      const days = data.dailyAggregates;
+      new Chart(document.getElementById('outputPerRequestChart'), {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.date),
+          datasets: [{
+            label: 'Gem. output tokens/request',
+            data: days.map(d => d.avgOutputPerRequest || 0),
+            borderColor: '#d2a8ff',
+            backgroundColor: '#d2a8ff20',
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { ticks: { color: '#7d8590', callback: v => fmt(v) }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderRequestsPerPromptChart() {
+      const days = data.dailyAggregates;
+      new Chart(document.getElementById('requestsPerPromptChart'), {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.date),
+          datasets: [{
+            label: 'API calls per user prompt',
+            data: days.map(d => d.avgRequestsPerUserPrompt || 0),
+            borderColor: '#f0883e',
+            backgroundColor: '#f0883e20',
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+            y: { min: 0, ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
+          },
+          plugins: {
+            legend: { labels: { color: '#e1e4e8' } },
+            annotation: { annotations: markerAnnotations() },
+          },
+        },
+      });
+    }
+
+    function renderAdvice() {
+      const days = data.dailyAggregates;
+      const prompts = data.prompts;
+      const advice = [];
+
+      // 1. Check if there are markers (plugins installed)
+      const hasMarkers = data.markers?.length > 0;
+      const marker = hasMarkers ? data.markers[0] : null;
+
+      if (hasMarkers && marker) {
+        const before = days.filter(d => d.date < marker.date);
+        const after = days.filter(d => d.date >= marker.date);
+
+        if (before.length >= 2 && after.length >= 2) {
+          const avgEffBefore = before.reduce((s, d) => s + d.inputTokens + d.outputTokens + d.cacheCreationTokens, 0) / before.reduce((s, d) => s + d.promptCount, 0);
+          const avgEffAfter = after.reduce((s, d) => s + d.inputTokens + d.outputTokens + d.cacheCreationTokens, 0) / after.reduce((s, d) => s + d.promptCount, 0);
+          const effChange = ((avgEffAfter - avgEffBefore) / avgEffBefore * 100).toFixed(0);
+
+          const avgOutBefore = before.reduce((s, d) => s + d.outputTokens, 0) / before.reduce((s, d) => s + d.promptCount, 0);
+          const avgOutAfter = after.reduce((s, d) => s + d.outputTokens, 0) / after.reduce((s, d) => s + d.promptCount, 0);
+          const outChange = ((avgOutAfter - avgOutBefore) / avgOutBefore * 100).toFixed(0);
+
+          if (effChange < -10 && outChange > -5) {
+            advice.push({ type: 'positive', label: 'Plugin werkt', text: `Effectieve tokens/prompt ${effChange}% sinds ${marker.label}, terwijl output stabiel bleef (${outChange > 0 ? '+' : ''}${outChange}%). De besparing is echt.` });
+          } else if (effChange < -10 && outChange < -10) {
+            advice.push({ type: 'warning', label: 'Mogelijk dommer', text: `Effectieve tokens ${effChange}%, maar output ook ${outChange}%. Het model produceert minder — check of de kwaliteit goed blijft. Overweeg de plugin uit te zetten en te vergelijken.` });
+          } else if (effChange > 5) {
+            advice.push({ type: 'negative', label: 'Plugin niet effectief', text: `Effectieve tokens/prompt is ${effChange > 0 ? '+' : ''}${effChange}% gestegen sinds ${marker.label}. De plugin bespaart niet — overweeg te verwijderen.` });
+          } else {
+            advice.push({ type: 'info', label: 'Neutraal', text: `Nog geen significant verschil zichtbaar (${effChange > 0 ? '+' : ''}${effChange}%). Meer data nodig — gebruik nog een paar dagen en check opnieuw.` });
+          }
+        } else {
+          advice.push({ type: 'info', label: 'Te weinig data', text: `Er zijn minimaal 2 dagen data nodig aan beide zijden van de markerdatum (${marker.date}). Blijf gebruiken en run het dashboard later opnieuw.` });
+        }
+      } else {
+        advice.push({ type: 'info', label: 'Geen plugins gemarkeerd', text: 'Voeg een marker toe in parse-usage.mjs nadat je een plugin installeert. Zonder marker kan het dashboard geen voor/na vergelijking maken.' });
+      }
+
+      // 2. Model usage advice
+      const modelTotals = {};
+      prompts.forEach(p => {
+        const m = modelShort(p.model);
+        if (!modelTotals[m]) modelTotals[m] = { count: 0, effective: 0 };
+        modelTotals[m].count++;
+        modelTotals[m].effective += p.inputTokens + p.outputTokens + p.cacheCreationTokens;
+      });
+
+      const opusKey = Object.keys(modelTotals).find(k => k.includes('Opus 4.6'));
+      const haikuKey = Object.keys(modelTotals).find(k => k.includes('Haiku'));
+      if (opusKey && modelTotals[opusKey]) {
+        const opusPct = (modelTotals[opusKey].count / prompts.length * 100).toFixed(0);
+        if (opusPct > 80) {
+          advice.push({ type: 'warning', label: 'Model-mix', text: `${opusPct}% van je requests draait op Opus (duurste model). Overweeg voor simpele taken Haiku of Sonnet te gebruiken — subagents in OMC doen dit al deels automatisch.` });
+        }
+      }
+
+      // 3. Expensive prompts detection
+      const sorted = [...prompts].sort((a, b) => (b.inputTokens + b.outputTokens + b.cacheCreationTokens) - (a.inputTokens + a.outputTokens + a.cacheCreationTokens));
+      const top5 = sorted.slice(0, 5);
+      const avgEffective = prompts.reduce((s, p) => s + p.inputTokens + p.outputTokens + p.cacheCreationTokens, 0) / prompts.length;
+      const expensiveThreshold = avgEffective * 5;
+      const expensiveCount = prompts.filter(p => (p.inputTokens + p.outputTokens + p.cacheCreationTokens) > expensiveThreshold).length;
+
+      if (expensiveCount > 0) {
+        const topPreview = top5[0].promptPreview?.slice(0, 80) || '[system]';
+        const topCost = fmt(top5[0].inputTokens + top5[0].outputTokens + top5[0].cacheCreationTokens);
+        advice.push({ type: 'warning', label: `${expensiveCount} dure prompts`, text: `${expensiveCount} prompts kosten 5x+ het gemiddelde. Duurste: "${topPreview}..." (${topCost} effectieve tokens). Scroll naar de tabel en sorteer op "Totaal" om deze te vinden.` });
+      }
+
+      // 4. Cache creation advice
+      const recentDays = days.slice(-3);
+      const avgCacheCreate = recentDays.reduce((s, d) => s + d.cacheCreationRatio, 0) / recentDays.length;
+      if (avgCacheCreate > 0.05) {
+        advice.push({ type: 'info', label: 'Cache creation hoog', text: `De laatste 3 dagen is ${(avgCacheCreate * 100).toFixed(1)}% van je input nieuw (niet uit cache). CodeSight en Context Optimizer kunnen dit verlagen door minder bestanden te lezen.` });
+      } else {
+        advice.push({ type: 'positive', label: 'Cache efficiënt', text: `Slechts ${(avgCacheCreate * 100).toFixed(1)}% van je input is nieuw — je cache wordt goed hergebruikt.` });
+      }
+
+      // 5. Session length advice
+      if (data.sessionAggregates?.length) {
+        const avgRequestsPerPrompt = data.sessionAggregates.reduce((s, sess) => s + sess.requestsPerUserPrompt, 0) / data.sessionAggregates.length;
+        if (avgRequestsPerPrompt > 15) {
+          advice.push({ type: 'warning', label: 'Veel retries', text: `Gemiddeld ${avgRequestsPerPrompt.toFixed(1)} API calls per user prompt. Dit kan betekenen dat Claude veel tool calls doet. Specifiekere prompts met bestandspaden verminderen dit.` });
+        }
+      }
+
+      // 6. Auto model routing advice
+      if (opusKey && modelTotals[opusKey]) {
+        const opusCount = modelTotals[opusKey].count;
+        const totalCount = prompts.length;
+        const opusPct = (opusCount / totalCount * 100).toFixed(0);
+
+        // Estimate how many Opus prompts had low output (likely simple tasks)
+        const opusPrompts = prompts.filter(p => p.model?.includes('opus'));
+        const lowOutputOpus = opusPrompts.filter(p => p.outputTokens < 200);
+        const lowOutputPct = opusPrompts.length > 0 ? (lowOutputOpus.length / opusPrompts.length * 100).toFixed(0) : 0;
+
+        if (lowOutputPct > 20) {
+          const potentialSavings = lowOutputOpus.length;
+          advice.push({ type: 'warning', label: 'Auto model routing',
+            text: `${lowOutputPct}% van je Opus-requests (${potentialSavings} calls) produceerde minder dan 200 output tokens — waarschijnlijk simpele taken die Haiku of Sonnet net zo goed kan. Overweeg auto-routing: installeer Houtini (delegeert automatisch naar goedkoper model) of bouw een PreToolUse hook die korte/simpele prompts naar Haiku stuurt. Geschatte besparing: ${potentialSavings} Opus-calls → Haiku = ~90% goedkoper per call.`
+          });
+        }
+
+        // Check for system/continuation heavy sessions (subagent overhead)
+        const continuationCount = prompts.filter(p => p.promptPreview === '[system/continuation]' && p.model?.includes('opus')).length;
+        const continuationPct = opusCount > 0 ? (continuationCount / opusCount * 100).toFixed(0) : 0;
+        if (continuationPct > 60) {
+          advice.push({ type: 'info', label: 'Subagent overhead',
+            text: `${continuationPct}% van je Opus-requests zijn system/continuation calls (tool results, thinking). Dit is normaal bij intensief tool-gebruik, maar elke call kost cache creation tokens. Kortere sessies of specifiekere prompts verminderen het aantal roundtrips.`
+          });
+        }
+      }
+
+      // 7. Prompt optimization advice
+      const userPrompts = prompts.filter(p => p.promptPreview !== '[system/continuation]');
+      if (userPrompts.length > 50) {
+        const shortPrompts = userPrompts.filter(p => (p.promptPreview?.length || 0) < 20);
+        const shortPct = (shortPrompts.length / userPrompts.length * 100).toFixed(0);
+        if (shortPct > 30) {
+          advice.push({ type: 'info', label: 'Prompt optimalisatie',
+            text: `${shortPct}% van je prompts is korter dan 20 tekens (bijv. "ja", "doe dit", "fix het"). Korte prompts leiden vaak tot meer tool calls omdat Claude meer moet uitzoeken. Specifiekere prompts met context en bestandspaden besparen roundtrips.`
+          });
+        }
+      }
+
+      // Render advice
+      document.getElementById('adviceContent').innerHTML = advice.map(a => `
+        <div class="advice-item advice-${a.type}">
+          <div class="advice-label">${a.label}</div>
+          <div>${a.text}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderComparison() {
+      if (!data.markers?.length) return;
+      const comp = document.getElementById('comparison');
+      comp.style.display = 'block';
+
+      const marker = data.markers[0];
+      const before = data.prompts.filter(p => p.timestamp?.slice(0, 10) < marker.date);
+      const after = data.prompts.filter(p => p.timestamp?.slice(0, 10) >= marker.date);
+
+      if (!before.length || !after.length) {
+        comp.innerHTML = '<div class="chart-title">Voor/Na vergelijking</div><p style="color:#7d8590">Onvoldoende data voor vergelijking. Er is data nodig aan beide zijden van de markerdatum.</p>';
+        return;
+      }
+
+      const eff = p => p.inputTokens + p.outputTokens + p.cacheCreationTokens;
+      const avgBefore = Math.round(before.reduce((s, p) => s + eff(p), 0) / before.length);
+      const avgAfter = Math.round(after.reduce((s, p) => s + eff(p), 0) / after.length);
+      const changePct = ((avgAfter - avgBefore) / avgBefore * 100).toFixed(1);
+
+      const crBefore = before.reduce((s, p) => s + p.cacheReadTokens, 0);
+      const ctBefore = before.reduce((s, p) => s + p.cacheCreationTokens + p.inputTokens, 0);
+      const ratioBefore = crBefore / (crBefore + ctBefore) || 0;
+
+      const crAfter = after.reduce((s, p) => s + p.cacheReadTokens, 0);
+      const ctAfter = after.reduce((s, p) => s + p.cacheCreationTokens + p.inputTokens, 0);
+      const ratioAfter = crAfter / (crAfter + ctAfter) || 0;
+
+      const allModels = [...new Set([...before, ...after].map(p => p.model))];
+      const perModelHtml = allModels.map(m => {
+        const bm = before.filter(p => p.model === m);
+        const am = after.filter(p => p.model === m);
+        if (!bm.length || !am.length) return '';
+        const avgB = Math.round(bm.reduce((s, p) => s + eff(p), 0) / bm.length);
+        const avgA = Math.round(am.reduce((s, p) => s + eff(p), 0) / am.length);
+        const chg = ((avgA - avgB) / avgB * 100).toFixed(1);
+        const crB = bm.reduce((s, p) => s + p.cacheReadTokens, 0);
+        const ctB = bm.reduce((s, p) => s + p.cacheCreationTokens + p.inputTokens, 0);
+        const crA = am.reduce((s, p) => s + p.cacheReadTokens, 0);
+        const ctA = am.reduce((s, p) => s + p.cacheCreationTokens + p.inputTokens, 0);
+        return `
+          <div class="comp-row">
+            <div class="comp-col">
+              <div class="comp-label"><span class="model-badge ${modelClass(m)}">${modelShort(m)}</span> voor (${bm.length})</div>
+              <div class="comp-value">${fmt(avgB)}/prompt</div>
+              <div class="card-detail">Cache: ${pct(crB / (crB + ctB) || 0)}</div>
+            </div>
+            <div class="comp-col">
+              <div class="comp-arrow">\u2192</div>
+              <div class="comp-change ${parseFloat(chg) <= 0 ? 'positive' : 'negative'}">${chg > 0 ? '+' : ''}${chg}%</div>
+            </div>
+            <div class="comp-col">
+              <div class="comp-label"><span class="model-badge ${modelClass(m)}">${modelShort(m)}</span> na (${am.length})</div>
+              <div class="comp-value">${fmt(avgA)}/prompt</div>
+              <div class="card-detail">Cache: ${pct(crA / (crA + ctA) || 0)}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('compGrid').innerHTML = `
+        <div class="comp-row">
+          <div class="comp-col">
+            <div class="comp-label">Totaal voor (${before.length} prompts)</div>
+            <div class="comp-value">${fmt(avgBefore)}/prompt</div>
+            <div class="card-detail">Cache ratio: ${pct(ratioBefore)}</div>
+          </div>
+          <div class="comp-col">
+            <div class="comp-arrow">\u2192</div>
+            <div class="comp-change ${parseFloat(changePct) <= 0 ? 'positive' : 'negative'}">${changePct > 0 ? '+' : ''}${changePct}%</div>
+          </div>
+          <div class="comp-col">
+            <div class="comp-label">Totaal na (${after.length} prompts)</div>
+            <div class="comp-value">${fmt(avgAfter)}/prompt</div>
+            <div class="card-detail">Cache ratio: ${pct(ratioAfter)}</div>
+          </div>
+        </div>
+        ${perModelHtml}
+      `;
+    }
+
+    function populateFilters() {
+      const models = [...new Set(data.prompts.map(p => p.model))];
+      const sel = document.getElementById('filterModel');
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = modelShort(m);
+        sel.appendChild(opt);
+      });
+
+      if (data.dailyAggregates.length) {
+        document.getElementById('filterFrom').value = data.dailyAggregates[0].date;
+        document.getElementById('filterTo').value = new Date().toISOString().slice(0, 10);
+      }
+
+      document.getElementById('filterModel').addEventListener('change', applyFilters);
+      document.getElementById('filterFrom').addEventListener('change', applyFilters);
+      document.getElementById('filterTo').addEventListener('change', applyFilters);
+      document.getElementById('filterSearch').addEventListener('input', applyFilters);
+
+      document.querySelectorAll('thead th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+          const field = th.dataset.sort;
+          if (sortField === field) sortAsc = !sortAsc;
+          else { sortField = field; sortAsc = false; }
+          document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted', 'asc'));
+          th.classList.add('sorted');
+          if (sortAsc) th.classList.add('asc');
+          applyFilters();
+        });
+      });
+    }
+
+    function applyFilters() {
+      const model = document.getElementById('filterModel').value;
+      const from = document.getElementById('filterFrom').value;
+      const to = document.getElementById('filterTo').value;
+      const search = document.getElementById('filterSearch').value.toLowerCase();
+
+      filteredPrompts = data.prompts.filter(p => {
+        if (model && p.model !== model) return false;
+        const date = p.timestamp?.slice(0, 10);
+        if (from && date < from) return false;
+        if (to && date > to) return false;
+        if (search && !p.promptPreview?.toLowerCase().includes(search)) return false;
+        return true;
+      });
+
+      filteredPrompts.sort((a, b) => {
+        let va = a[sortField], vb = b[sortField];
+        if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        return sortAsc ? va - vb : vb - va;
+      });
+
+      currentPage = 0;
+      renderTable();
+    }
+
+    function renderTable() {
+      const start = currentPage * PAGE_SIZE;
+      const page = filteredPrompts.slice(start, start + PAGE_SIZE);
+      const tbody = document.getElementById('promptTable');
+
+      const globalAvgEffective = data.prompts.reduce((s, p) => s + p.inputTokens + p.outputTokens + p.cacheCreationTokens, 0) / data.prompts.length;
+      const expThreshold = globalAvgEffective * 5;
+
+      tbody.innerHTML = page.map(p => {
+        const eff = p.inputTokens + p.outputTokens + p.cacheCreationTokens;
+        const isExpensive = eff > expThreshold;
+        return `
+        <tr style="${isExpensive ? 'background:#1f0d0d;' : ''}">
+          <td>${new Date(p.timestamp).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+          <td class="prompt-text" title="${(p.promptPreview || '').replace(/"/g, '&quot;')}">${p.promptPreview || '-'}</td>
+          <td><span class="model-badge ${modelClass(p.model)}">${modelShort(p.model)}</span></td>
+          <td class="token-num">${fmt(p.inputTokens)}</td>
+          <td class="token-num">${fmt(p.outputTokens)}</td>
+          <td class="token-num">${fmt(p.cacheReadTokens)}</td>
+          <td class="token-num">${fmt(p.cacheCreationTokens)}</td>
+          <td class="token-num"><strong>${fmt(p.totalTokens)}</strong>${isExpensive ? ' <span style="color:#f85149;font-size:0.7rem;">DUUR</span>' : ''}</td>
+        </tr>`;
+      }).join('');
+
+      const totalPages = Math.ceil(filteredPrompts.length / PAGE_SIZE);
+      document.getElementById('pagination').innerHTML = `
+        <button ${currentPage === 0 ? 'disabled' : ''} onclick="currentPage=0;renderTable();">\u00AB</button>
+        <button ${currentPage === 0 ? 'disabled' : ''} onclick="currentPage--;renderTable();">\u2039</button>
+        <span class="page-info">${start + 1}\u2013${Math.min(start + PAGE_SIZE, filteredPrompts.length)} van ${filteredPrompts.length}</span>
+        <button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="currentPage++;renderTable();">\u203A</button>
+        <button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="currentPage=totalPages-1;renderTable();">\u00BB</button>
+      `;
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
