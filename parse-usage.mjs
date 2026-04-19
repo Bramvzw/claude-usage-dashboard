@@ -1,16 +1,19 @@
 import { readdir, readFile, access, stat } from 'node:fs/promises';
-import { createReadStream, writeFileSync, existsSync } from 'node:fs';
+import { createReadStream, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { join, resolve } from 'node:path';
+import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLAUDE_DIR = join(homedir(), '.claude');
 const PROJECTS_DIR = join(CLAUDE_DIR, 'projects');
-const OUTPUT_PATH = join(CLAUDE_DIR, 'tools', 'dashboard-data.json');
+const OUTPUT_DIR = process.env.DASHBOARD_OUTPUT || __dirname;
 
-const MARKERS = [
-  { date: '2026-04-18', label: 'CodeSight geïnstalleerd' },
-];
+const MARKERS_PATH = join(__dirname, 'markers.json');
+const MARKERS = existsSync(MARKERS_PATH)
+  ? JSON.parse(readFileSync(MARKERS_PATH, 'utf-8'))
+  : [];
 
 async function findProjectDirs() {
   const entries = await readdir(PROJECTS_DIR, { withFileTypes: true });
@@ -176,7 +179,7 @@ async function main() {
 
   allPrompts.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  console.log(`Parsed ${totalFiles} JSONL files, found ${allPrompts.length} unique API requests`);
+  console.log(`Parsed ${totalFiles} JSONL files, found ${allPrompts.length} unique prompts`);
 
   const dailyMap = new Map();
   const sessionSet = new Set();
@@ -243,7 +246,6 @@ async function main() {
       };
     });
 
-  // Session-level aggregates for effectiveness tracking
   const sessionMap = new Map();
   for (const p of allPrompts) {
     if (!p.sessionId) continue;
@@ -275,7 +277,6 @@ async function main() {
     };
   }).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-  // Daily effectiveness metrics
   for (const day of dailyAggregates) {
     const daySessions = sessionAggregates.filter(s => s.date === day.date);
     day.avgRequestsPerUserPrompt = daySessions.length > 0
@@ -293,10 +294,10 @@ async function main() {
   });
   const codesightActive = projectRoots.some(r => existsSync(join(r, '.codesight')));
   const pluginChecks = [
-    { name: 'CodeSight', forceActive: codesightActive, type: 'dir', description: 'Codebase-index voor minder Grep/Read calls' },
-    { name: 'Context Optimizer', path: join(CLAUDE_DIR, 'plugins', 'claude-context-optimizer'), type: 'dir', description: 'Blokkeert redundante file reads' },
-    { name: 'LSP Enforcement Kit', path: join(CLAUDE_DIR, 'hooks'), type: 'file', checkFile: 'lsp', description: 'Dwingt LSP af i.p.v. Grep voor navigatie' },
-    { name: 'Skill Manager', path: join(CLAUDE_DIR, 'skills-disabled'), type: 'dir', description: 'Parkeert ongebruikte skills (~4K tokens/gesprek)' },
+    { name: 'CodeSight', forceActive: codesightActive, type: 'dir', description: 'Codebase index for fewer Grep/Read calls' },
+    { name: 'Context Optimizer', path: join(CLAUDE_DIR, 'plugins', 'claude-context-optimizer'), type: 'dir', description: 'Blocks redundant file reads' },
+    { name: 'LSP Enforcement Kit', path: join(CLAUDE_DIR, 'hooks'), type: 'file', checkFile: 'lsp', description: 'Enforces LSP over Grep for navigation' },
+    { name: 'Skill Manager', path: join(CLAUDE_DIR, 'skills-disabled'), type: 'dir', description: 'Parks unused skills (~4K tokens/conversation)' },
   ];
 
   for (const check of pluginChecks) {
@@ -323,25 +324,22 @@ async function main() {
     }
   }
 
-  // Check MCP servers in settings
   try {
     const settingsPath = join(CLAUDE_DIR, 'settings.json');
     const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
     const mcpServers = settings.mcpServers || {};
-    for (const [name, config] of Object.entries(mcpServers)) {
-      const knownPlugins = { 'houtini-lm': 'Delegeert simpele taken naar goedkopere modellen', 'codex-mcp': 'Delegeert naar Codex, filtert thinking tokens', 'kimi-code': 'Delegeert naar Kimi K2.5' };
-      if (knownPlugins[name]) {
-        plugins.push({ name: name, active: true, description: knownPlugins[name], type: 'mcp' });
+    for (const [name] of Object.entries(mcpServers)) {
+      if (!plugins.some(p => p.name === name)) {
+        plugins.push({ name, active: true, description: 'MCP server', type: 'mcp' });
       }
     }
   } catch {}
 
-  // Check project-level MCP
   try {
     const mcpPath = join(process.cwd(), '.mcp.json');
     const mcp = JSON.parse(await readFile(mcpPath, 'utf-8'));
     const mcpServers = mcp.mcpServers || {};
-    for (const [name, config] of Object.entries(mcpServers)) {
+    for (const [name] of Object.entries(mcpServers)) {
       if (!plugins.some(p => p.name === name)) {
         plugins.push({ name, active: true, description: 'MCP server (project)', type: 'mcp' });
       }
@@ -361,10 +359,11 @@ async function main() {
     sessionAggregates,
   };
 
-  writeFileSync(OUTPUT_PATH, JSON.stringify(output, null, 2));
-  const jsPath = OUTPUT_PATH.replace('.json', '.js');
+  const jsonPath = join(OUTPUT_DIR, 'dashboard-data.json');
+  const jsPath = join(OUTPUT_DIR, 'dashboard-data.js');
+  writeFileSync(jsonPath, JSON.stringify(output, null, 2));
   writeFileSync(jsPath, `window.__DASHBOARD_DATA__ = ${JSON.stringify(output)};\n`);
-  console.log(`Dashboard data written to ${OUTPUT_PATH} and ${jsPath}`);
+  console.log(`Dashboard data written to ${jsonPath}`);
   console.log(`  ${allPrompts.length} prompts across ${dailyAggregates.length} days`);
   console.log(`  ${sessionSet.size} unique sessions`);
 
