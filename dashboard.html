@@ -117,6 +117,7 @@
   <div class="chart-row">
     <div class="chart-container">
       <div class="chart-title">Dagelijks tokenverbruik per model</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Absoluut totaal — afhankelijk van hoeveel je promptt die dag.</div>
       <canvas id="dailyChart"></canvas>
     </div>
     <div class="chart-container">
@@ -158,8 +159,8 @@
   <!-- SECTIE 7: Normalisatie (appels-met-appels) -->
   <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Genormaliseerde Vergelijking</h2></div>
   <div class="chart-container">
-    <div class="chart-title">Gem. tokens per prompt per model</div>
-    <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Vergelijkt appels met appels — zelfde model, andere dag. Daling = echte besparing.</div>
+    <div class="chart-title">Effectieve tokens per prompt per model</div>
+    <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Appels met appels — zelfde model, genormaliseerd per prompt (zonder cache reads). Daling = echte besparing.</div>
     <canvas id="normalizedAvgChart"></canvas>
   </div>
   <div class="chart-row">
@@ -480,7 +481,11 @@
         const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
         return {
           label: modelShort(m),
-          data: days.map(d => d.modelStats?.[m]?.avgTokensPerPrompt || null),
+          data: days.map(d => {
+            const ms = d.modelStats?.[m];
+            if (!ms || ms.promptCount === 0) return null;
+            return Math.round((ms.inputTokens + ms.outputTokens + ms.cacheCreationTokens) / ms.promptCount);
+          }),
           borderColor: colors[colorKey],
           backgroundColor: colors[colorKey] + '20',
           tension: 0.3,
