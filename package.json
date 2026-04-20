@@ -26,6 +26,13 @@
     "type": "git",
     "url": "git+https://github.com/Bramvzw/claude-usage-dashboard.git"
   },
+  "homepage": "https://github.com/Bramvzw/claude-usage-dashboard#readme",
+  "bugs": {
+    "url": "https://github.com/Bramvzw/claude-usage-dashboard/issues"
+  },
+  "scripts": {
+    "start": "node bin/cli.mjs"
+  },
   "engines": {
     "node": ">=18"
   }

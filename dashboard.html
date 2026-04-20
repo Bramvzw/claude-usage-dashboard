@@ -52,6 +52,7 @@
     .model-opus47 { background: #4e1b3a; color: #ff9ec3; }
     .model-sonnet { background: #1b3a4e; color: #79c0ff; }
     .model-haiku { background: #1b4e2d; color: #7ee787; }
+    .model-other { background: #30363d; color: #e1e4e8; }
     .token-num { font-variant-numeric: tabular-nums; text-align: right; }
 
     .pagination { display: flex; gap: 8px; margin-top: 16px; justify-content: center; align-items: center; }
@@ -225,12 +226,18 @@
 
     function pct(n) { return (n * 100).toFixed(1) + '%'; }
 
+    function esc(s) {
+      const el = document.createElement('span');
+      el.textContent = s;
+      return el.innerHTML;
+    }
+
     function modelClass(model) {
       if (model?.includes('opus-4-7')) return 'model-opus47';
       if (model?.includes('opus')) return 'model-opus';
       if (model?.includes('sonnet')) return 'model-sonnet';
       if (model?.includes('haiku')) return 'model-haiku';
-      return '';
+      return 'model-other';
     }
 
     function modelShort(model) {
@@ -238,7 +245,7 @@
       if (model?.includes('opus-4-6')) return 'Opus 4.6';
       if (model?.includes('sonnet')) return 'Sonnet 4.6';
       if (model?.includes('haiku')) return 'Haiku 4.5';
-      return model || 'Unknown';
+      return model?.split('-').slice(1, 4).join(' ') || 'Unknown';
     }
 
     function render() {
@@ -303,14 +310,19 @@
         document.getElementById('pluginContent').innerHTML = '<div style="color:#7d8590;font-size:0.85rem;">No plugins detected. Install plugins to optimize token usage.</div>';
         return;
       }
+      const activePlugins = plugins.filter(p => p.active);
+      if (activePlugins.length === 0) {
+        document.getElementById('pluginContent').innerHTML = '<p style="color:#7d8590;">No active plugins detected.</p>';
+        return;
+      }
       document.getElementById('pluginContent').innerHTML = `
         <div class="plugin-grid">
-          ${plugins.map(p => `
-            <div class="plugin-badge ${p.active ? 'plugin-active' : 'plugin-inactive'}">
+          ${activePlugins.map(p => `
+            <div class="plugin-badge plugin-active">
               <span class="plugin-dot"></span>
               <div>
-                <div>${p.name}</div>
-                <div class="plugin-desc">${p.description}</div>
+                <div>${esc(p.name)}</div>
+                <div class="plugin-desc">${esc(p.description)}</div>
               </div>
             </div>
           `).join('')}
@@ -718,7 +730,7 @@
       if (opusKey && modelTotals[opusKey]) {
         const opusPct = (modelTotals[opusKey].count / prompts.length * 100).toFixed(0);
         if (opusPct > 80) {
-          advice.push({ type: 'warning', label: 'Model mix', text: `${opusPct}% of your requests run on Opus (most expensive model). Consider using Haiku or Sonnet for simple tasks \u2014 OMC subagents already do this partially.` });
+          advice.push({ type: 'warning', label: 'Model mix', text: `${opusPct}% of your requests run on Opus (most expensive model). Consider using Haiku or Sonnet for simple tasks like lookups and small edits.` });
         }
       }
 
@@ -764,7 +776,7 @@
         if (lowOutputPct > 20) {
           const potentialSavings = lowOutputOpus.length;
           advice.push({ type: 'warning', label: 'Auto model routing',
-            text: `${lowOutputPct}% of your Opus requests (${potentialSavings} calls) produced less than 200 output tokens \u2014 likely simple tasks that Haiku or Sonnet can handle equally well. Consider auto-routing: install Houtini (automatically delegates to cheaper model) or build a PreToolUse hook that routes short/simple prompts to Haiku. Estimated savings: ${potentialSavings} Opus calls \u2192 Haiku = ~90% cheaper per call.`
+            text: `${lowOutputPct}% of your Opus requests (${potentialSavings} calls) produced less than 200 output tokens \u2014 likely simple tasks that Haiku or Sonnet can handle equally well. Consider a model routing plugin or a PreToolUse hook that routes short/simple prompts to Haiku. Estimated savings: ${potentialSavings} Opus calls \u2192 Haiku = ~90% cheaper per call.`
           });
         }
 
@@ -971,7 +983,7 @@
         return `
         <tr style="${isExpensive ? 'background:#1f0d0d;' : ''}">
           <td>${dateStr}</td>
-          <td class="prompt-text" title="${(p.promptPreview || '').replace(/"/g, '&quot;')}">${p.promptPreview || '-'}</td>
+          <td class="prompt-text" title="${esc(p.promptPreview || '')}">${esc(p.promptPreview || '-')}</td>
           <td><span class="model-badge ${modelClass(p.model)}">${modelShort(p.model)}</span></td>
           <td class="token-num">${fmt(p.inputTokens)}</td>
           <td class="token-num">${fmt(p.outputTokens)}</td>

@@ -10,7 +10,8 @@ const CLAUDE_DIR = join(homedir(), '.claude');
 const PROJECTS_DIR = join(CLAUDE_DIR, 'projects');
 const OUTPUT_DIR = process.env.DASHBOARD_OUTPUT || __dirname;
 
-const MARKERS_PATH = join(__dirname, 'markers.json');
+const cwdMarkers = join(process.cwd(), 'markers.json');
+const MARKERS_PATH = existsSync(cwdMarkers) ? cwdMarkers : join(__dirname, 'markers.json');
 const MARKERS = existsSync(MARKERS_PATH)
   ? JSON.parse(readFileSync(MARKERS_PATH, 'utf-8'))
   : [];

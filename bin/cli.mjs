@@ -27,8 +27,8 @@ try {
     env: { ...process.env, DASHBOARD_OUTPUT: outDir },
     stdio: 'inherit',
   });
-} catch {
-  console.error('Failed to parse usage data.');
+} catch (err) {
+  console.error('Failed to parse usage data:', err.message);
   process.exit(1);
 }
 

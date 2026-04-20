@@ -60,4 +60,8 @@ Markers appear as vertical lines on all charts and enable before/after compariso
 2. Deduplicates API requests by `requestId` and groups them by user prompt via `parentUuid` chain
 3. Tracks tokens per model for accurate per-model comparisons
 4. Computes daily aggregates, session metrics, and plugin detection
-5. Outputs `dashboard-data.js` loaded by the self-contained `dashboard.html`
+5. Outputs `dashboard-data.js` loaded by `dashboard.html` (uses Chart.js from CDN for rendering)
+
+## Privacy
+
+All data parsing happens locally on your machine. No conversation data is uploaded or sent anywhere. The only network request the dashboard makes is loading [Chart.js](https://www.chartjs.org/) from a CDN for chart rendering.
