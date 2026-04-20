@@ -121,8 +121,8 @@
       <canvas id="dailyChart"></canvas>
     </div>
     <div class="chart-container">
-      <div class="chart-title">Effectieve tokens per prompt</div>
-      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Zonder cache reads — dit zijn je werkelijke kosten.</div>
+      <div class="chart-title">Effectieve tokens per prompt per model</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Per model, zonder cache reads. Daling binnen zelfde kleur = echte besparing.</div>
       <canvas id="avgChart"></canvas>
     </div>
   </div>
@@ -156,13 +156,8 @@
     </div>
   </div>
 
-  <!-- SECTIE 7: Normalisatie (appels-met-appels) -->
-  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Genormaliseerde Vergelijking</h2></div>
-  <div class="chart-container">
-    <div class="chart-title">Effectieve tokens per prompt per model</div>
-    <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Appels met appels — zelfde model, genormaliseerd per prompt (zonder cache reads). Daling = echte besparing.</div>
-    <canvas id="normalizedAvgChart"></canvas>
-  </div>
+  <!-- SECTIE 7: Model verdeling -->
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Model Verdeling</h2></div>
   <div class="chart-row">
     <div class="chart-container">
       <div class="chart-title">Model verdeling</div>
@@ -260,7 +255,6 @@
       renderAvgChart();
       renderModelChart();
       renderCacheChart();
-      renderNormalizedAvgChart();
       renderCacheCreationChart();
       renderModelMixChart();
       renderOutputPerRequestChart();
@@ -386,26 +380,29 @@
 
     function renderAvgChart() {
       const days = data.dailyAggregates;
+      const allModels = [...new Set(days.flatMap(d => Object.keys(d.modelStats || {})))];
+      const colors = { opus47: '#ff9ec3', opus: '#d2a8ff', sonnet: '#79c0ff', haiku: '#7ee787' };
+
+      const datasets = allModels.map(m => {
+        const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
+        return {
+          label: modelShort(m),
+          data: days.map(d => {
+            const ms = d.modelStats?.[m];
+            if (!ms || ms.promptCount === 0) return null;
+            return Math.round((ms.inputTokens + ms.outputTokens + ms.cacheCreationTokens) / ms.promptCount);
+          }),
+          borderColor: colors[colorKey],
+          backgroundColor: colors[colorKey] + '20',
+          tension: 0.3,
+          spanGaps: true,
+          pointRadius: 4,
+        };
+      });
+
       new Chart(document.getElementById('avgChart'), {
         type: 'line',
-        data: {
-          labels: days.map(d => d.date),
-          datasets: [{
-            label: 'Effectief (input+output+cache create)',
-            data: days.map(d => d.promptCount > 0 ? Math.round((d.inputTokens + d.outputTokens + d.cacheCreationTokens) / d.promptCount) : 0),
-            borderColor: '#f0883e',
-            backgroundColor: '#f0883e20',
-            fill: true,
-            tension: 0.3,
-          }, {
-            label: 'Totaal (incl. cache reads)',
-            data: days.map(d => d.avgTokensPerPrompt),
-            borderColor: '#7d859080',
-            borderDash: [5, 3],
-            tension: 0.3,
-            pointRadius: 2,
-          }],
-        },
+        data: { labels: days.map(d => d.date), datasets },
         options: {
           responsive: true,
           scales: {
@@ -655,32 +652,81 @@
       const marker = hasMarkers ? data.markers[0] : null;
 
       if (hasMarkers && marker) {
+        const beforePrompts = prompts.filter(p => p.timestamp?.slice(0, 10) < marker.date);
+        const afterPrompts = prompts.filter(p => p.timestamp?.slice(0, 10) >= marker.date);
         const before = days.filter(d => d.date < marker.date);
         const after = days.filter(d => d.date >= marker.date);
 
         if (before.length >= 2 && after.length >= 2) {
-          const avgEffBefore = before.reduce((s, d) => s + d.inputTokens + d.outputTokens + d.cacheCreationTokens, 0) / before.reduce((s, d) => s + d.promptCount, 0);
-          const avgEffAfter = after.reduce((s, d) => s + d.inputTokens + d.outputTokens + d.cacheCreationTokens, 0) / after.reduce((s, d) => s + d.promptCount, 0);
-          const effChange = ((avgEffAfter - avgEffBefore) / avgEffBefore * 100).toFixed(0);
+          const eff = p => p.inputTokens + p.outputTokens + p.cacheCreationTokens;
 
-          const avgOutBefore = before.reduce((s, d) => s + d.outputTokens, 0) / before.reduce((s, d) => s + d.promptCount, 0);
-          const avgOutAfter = after.reduce((s, d) => s + d.outputTokens, 0) / after.reduce((s, d) => s + d.promptCount, 0);
-          const outChange = ((avgOutAfter - avgOutBefore) / avgOutBefore * 100).toFixed(0);
+          // Per-model comparison (apples to apples)
+          const modelsBefore = {};
+          const modelsAfter = {};
+          beforePrompts.forEach(p => {
+            const m = p.model?.split(',')[0]?.trim() || 'unknown';
+            if (!modelsBefore[m]) modelsBefore[m] = { count: 0, eff: 0, out: 0 };
+            modelsBefore[m].count++;
+            modelsBefore[m].eff += eff(p);
+            modelsBefore[m].out += p.outputTokens;
+          });
+          afterPrompts.forEach(p => {
+            const m = p.model?.split(',')[0]?.trim() || 'unknown';
+            if (!modelsAfter[m]) modelsAfter[m] = { count: 0, eff: 0, out: 0 };
+            modelsAfter[m].count++;
+            modelsAfter[m].eff += eff(p);
+            modelsAfter[m].out += p.outputTokens;
+          });
 
-          if (effChange < -10 && outChange > -5) {
-            advice.push({ type: 'positive', label: 'Plugin werkt', text: `Effectieve tokens/prompt ${effChange}% sinds ${marker.label}, terwijl output stabiel bleef (${outChange > 0 ? '+' : ''}${outChange}%). De besparing is echt.` });
-          } else if (effChange < -10 && outChange < -10) {
-            advice.push({ type: 'warning', label: 'Mogelijk dommer', text: `Effectieve tokens ${effChange}%, maar output ook ${outChange}%. Het model produceert minder — check of de kwaliteit goed blijft. Overweeg de plugin uit te zetten en te vergelijken.` });
-          } else if (effChange > 5) {
-            advice.push({ type: 'negative', label: 'Plugin niet effectief', text: `Effectieve tokens/prompt is ${effChange > 0 ? '+' : ''}${effChange}% gestegen sinds ${marker.label}. De plugin bespaart niet — overweeg te verwijderen.` });
+          const MIN_SAMPLES = 30;
+          const sharedModels = Object.keys(modelsBefore).filter(m => modelsAfter[m] && modelsBefore[m].count >= MIN_SAMPLES && modelsAfter[m].count >= MIN_SAMPLES);
+          const lowSampleModels = Object.keys(modelsBefore).filter(m => modelsAfter[m] && (modelsBefore[m].count < MIN_SAMPLES || modelsAfter[m].count < MIN_SAMPLES));
+          const newModels = Object.keys(modelsAfter).filter(m => !modelsBefore[m] && modelsAfter[m].count >= 5);
+
+          if (sharedModels.length > 0) {
+            const perModelResults = sharedModels.map(m => {
+              const avgB = modelsBefore[m].eff / modelsBefore[m].count;
+              const avgA = modelsAfter[m].eff / modelsAfter[m].count;
+              const change = ((avgA - avgB) / avgB * 100).toFixed(0);
+              const outB = modelsBefore[m].out / modelsBefore[m].count;
+              const outA = modelsAfter[m].out / modelsAfter[m].count;
+              const outChange = ((outA - outB) / outB * 100).toFixed(0);
+              return { model: modelShort(m), change: +change, outChange: +outChange, countBefore: modelsBefore[m].count, countAfter: modelsAfter[m].count };
+            });
+
+            const summary = perModelResults.map(r => `${r.model}: ${r.change > 0 ? '+' : ''}${r.change}% (${r.countBefore}→${r.countAfter} prompts)`).join(', ');
+
+            const improving = perModelResults.filter(r => r.change < -10 && r.outChange > -5);
+            const worse = perModelResults.filter(r => r.change > 10);
+
+            if (improving.length > 0 && worse.length === 0) {
+              advice.push({ type: 'positive', label: 'Plugin werkt', text: `Per-model vergelijking sinds ${marker.label}: ${summary}. Besparing is echt (zelfde model, minder tokens).` });
+            } else if (worse.length > 0 && improving.length === 0) {
+              advice.push({ type: 'warning', label: 'Plugin neutraal/negatief', text: `Per-model vergelijking (zelfde model): ${summary}. Stijging binnen hetzelfde model — plugin bespaart hier niet.` });
+            } else if (perModelResults.every(r => Math.abs(r.change) <= 10)) {
+              advice.push({ type: 'info', label: 'Neutraal', text: `Per-model vergelijking: ${summary}. Geen significant verschil — meer data nodig of plugin heeft minimaal effect.` });
+            } else {
+              advice.push({ type: 'info', label: 'Gemengd resultaat', text: `Per-model vergelijking: ${summary}. Sommige modellen besparen, andere niet.` });
+            }
+          } else if (lowSampleModels.length > 0) {
+            const info = lowSampleModels.map(m => {
+              const b = modelsBefore[m], a = modelsAfter[m];
+              return `${modelShort(m)}: ${b.count}→${a.count} prompts`;
+            }).join(', ');
+            advice.push({ type: 'info', label: 'Te weinig data per model', text: `Minimaal ${MIN_SAMPLES} prompts per model nodig voor betrouwbare vergelijking. Huidige aantallen: ${info}. Blijf gebruiken en check later opnieuw.` });
           } else {
-            advice.push({ type: 'info', label: 'Neutraal', text: `Nog geen significant verschil zichtbaar (${effChange > 0 ? '+' : ''}${effChange}%). Meer data nodig — gebruik nog een paar dagen en check opnieuw.` });
+            advice.push({ type: 'info', label: 'Model gewisseld', text: `Je gebruikt na ${marker.label} voornamelijk andere modellen dan ervoor. Per-model vergelijking niet mogelijk — totaalvergelijking is dan niet betrouwbaar.` });
+          }
+
+          if (newModels.length > 0) {
+            const newInfo = newModels.map(m => `${modelShort(m)} (${modelsAfter[m].count} prompts, ${fmt(Math.round(modelsAfter[m].eff / modelsAfter[m].count))}/prompt)`).join(', ');
+            advice.push({ type: 'info', label: 'Nieuw model', text: `Sinds ${marker.label} gebruik je ook: ${newInfo}. Dit beïnvloedt het totaalgemiddelde maar zegt niets over plugin-effectiviteit.` });
           }
         } else {
           advice.push({ type: 'info', label: 'Te weinig data', text: `Er zijn minimaal 2 dagen data nodig aan beide zijden van de markerdatum (${marker.date}). Blijf gebruiken en run het dashboard later opnieuw.` });
         }
       } else {
-        advice.push({ type: 'info', label: 'Geen plugins gemarkeerd', text: 'Voeg een marker toe in parse-usage.mjs nadat je een plugin installeert. Zonder marker kan het dashboard geen voor/na vergelijking maken.' });
+        advice.push({ type: 'info', label: 'Geen plugins gemarkeerd', text: 'Voeg een marker toe in markers.json nadat je een plugin installeert. Zonder marker kan het dashboard geen voor/na vergelijking maken.' });
       }
 
       // 2. Model usage advice
@@ -807,11 +853,12 @@
       const ctAfter = after.reduce((s, p) => s + p.cacheCreationTokens + p.inputTokens, 0);
       const ratioAfter = crAfter / (crAfter + ctAfter) || 0;
 
+      const MIN_COMP = 20;
       const allModels = [...new Set([...before, ...after].map(p => p.model))];
       const perModelHtml = allModels.map(m => {
         const bm = before.filter(p => p.model === m);
         const am = after.filter(p => p.model === m);
-        if (!bm.length || !am.length) return '';
+        if (bm.length < MIN_COMP || am.length < MIN_COMP) return '';
         const avgB = Math.round(bm.reduce((s, p) => s + eff(p), 0) / bm.length);
         const avgA = Math.round(am.reduce((s, p) => s + eff(p), 0) / am.length);
         const chg = ((avgA - avgB) / avgB * 100).toFixed(1);
@@ -838,6 +885,24 @@
           </div>`;
       }).join('');
 
+      const skippedModels = allModels.filter(m => {
+        const bm = before.filter(p => p.model === m).length;
+        const am = after.filter(p => p.model === m).length;
+        return (bm > 0 || am > 0) && (bm < MIN_COMP || am < MIN_COMP);
+      });
+      const skippedNote = skippedModels.length > 0
+        ? `<div style="text-align:center;color:#7d8590;font-size:0.8rem;padding:8px 0;">${skippedModels.map(m => modelShort(m)).join(', ')}: te weinig data (min. ${MIN_COMP} prompts per kant)</div>`
+        : '';
+
+      const modelMixChanged = allModels.some(m => {
+        const inBefore = before.some(p => p.model === m);
+        const inAfter = after.some(p => p.model === m);
+        return inBefore !== inAfter;
+      });
+      const totalNote = modelMixChanged
+        ? '<div style="text-align:center;color:#7d8590;font-size:0.75rem;margin-top:4px;">Model-mix is veranderd — totaal is indicatief, per-model vergelijking is betrouwbaarder.</div>'
+        : '';
+
       document.getElementById('compGrid').innerHTML = `
         <div class="comp-row">
           <div class="comp-col">
@@ -855,7 +920,9 @@
             <div class="card-detail">Cache ratio: ${pct(ratioAfter)}</div>
           </div>
         </div>
+        ${totalNote}
         ${perModelHtml}
+        ${skippedNote}
       `;
     }
 

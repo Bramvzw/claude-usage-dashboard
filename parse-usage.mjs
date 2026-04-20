@@ -138,40 +138,48 @@ async function main() {
             timestamp: userPrompt?.timestamp || assistant.timestamp,
             sessionId: userPrompt?.sessionId || assistant.sessionId,
             promptPreview: userPrompt?.preview || '[system/continuation]',
-            models: new Set(),
-            inputTokens: 0,
-            outputTokens: 0,
-            cacheReadTokens: 0,
-            cacheCreationTokens: 0,
+            perModel: {},
             apiCalls: 0,
           });
         }
 
         const group = groupedByUserPrompt.get(groupKey);
-        group.models.add(assistant.model);
-        group.inputTokens += assistant.inputTokens;
-        group.outputTokens += assistant.outputTokens;
-        group.cacheReadTokens += assistant.cacheReadTokens;
-        group.cacheCreationTokens += assistant.cacheCreationTokens;
+        const m = assistant.model;
+        if (!group.perModel[m]) {
+          group.perModel[m] = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+        }
+        group.perModel[m].inputTokens += assistant.inputTokens;
+        group.perModel[m].outputTokens += assistant.outputTokens;
+        group.perModel[m].cacheReadTokens += assistant.cacheReadTokens;
+        group.perModel[m].cacheCreationTokens += assistant.cacheCreationTokens;
         group.apiCalls++;
       }
 
       for (const [, group] of groupedByUserPrompt) {
-        const totalTokens = group.inputTokens + group.outputTokens +
-          group.cacheReadTokens + group.cacheCreationTokens;
+        const models = Object.keys(group.perModel);
+        const inputTokens = models.reduce((s, m) => s + group.perModel[m].inputTokens, 0);
+        const outputTokens = models.reduce((s, m) => s + group.perModel[m].outputTokens, 0);
+        const cacheReadTokens = models.reduce((s, m) => s + group.perModel[m].cacheReadTokens, 0);
+        const cacheCreationTokens = models.reduce((s, m) => s + group.perModel[m].cacheCreationTokens, 0);
+        const totalTokens = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
         if (totalTokens === 0) continue;
+
+        // Primary model = most output tokens (the one doing the real work)
+        const primaryModel = models.reduce((best, m) =>
+          group.perModel[m].outputTokens > (group.perModel[best]?.outputTokens || 0) ? m : best, models[0]);
 
         allPrompts.push({
           timestamp: group.timestamp,
           sessionId: group.sessionId,
           promptPreview: group.promptPreview,
-          model: [...group.models].join(', '),
-          inputTokens: group.inputTokens,
-          outputTokens: group.outputTokens,
-          cacheReadTokens: group.cacheReadTokens,
-          cacheCreationTokens: group.cacheCreationTokens,
+          model: primaryModel,
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          cacheCreationTokens,
           totalTokens,
           apiCalls: group.apiCalls,
+          perModel: group.perModel,
         });
       }
     }
@@ -211,18 +219,23 @@ async function main() {
     day.cacheReadTokens += p.cacheReadTokens;
     day.cacheCreationTokens += p.cacheCreationTokens;
     day.promptCount++;
-    day.byModel[p.model] = (day.byModel[p.model] || 0) + p.totalTokens;
+    // Split tokens to individual models via perModel breakdown
+    const modelEntries = p.perModel ? Object.entries(p.perModel) : [[p.model, { inputTokens: p.inputTokens, outputTokens: p.outputTokens, cacheReadTokens: p.cacheReadTokens, cacheCreationTokens: p.cacheCreationTokens }]];
+    for (const [model, mt] of modelEntries) {
+      const mTotal = mt.inputTokens + mt.outputTokens + mt.cacheReadTokens + mt.cacheCreationTokens;
+      day.byModel[model] = (day.byModel[model] || 0) + mTotal;
 
-    if (!day.modelDetails[p.model]) {
-      day.modelDetails[p.model] = { promptCount: 0, totalTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, inputTokens: 0, outputTokens: 0 };
+      if (!day.modelDetails[model]) {
+        day.modelDetails[model] = { promptCount: 0, totalTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, inputTokens: 0, outputTokens: 0 };
+      }
+      const md = day.modelDetails[model];
+      md.promptCount++;
+      md.totalTokens += mTotal;
+      md.cacheReadTokens += mt.cacheReadTokens;
+      md.cacheCreationTokens += mt.cacheCreationTokens;
+      md.inputTokens += mt.inputTokens;
+      md.outputTokens += mt.outputTokens;
     }
-    const md = day.modelDetails[p.model];
-    md.promptCount++;
-    md.totalTokens += p.totalTokens;
-    md.cacheReadTokens += p.cacheReadTokens;
-    md.cacheCreationTokens += p.cacheCreationTokens;
-    md.inputTokens += p.inputTokens;
-    md.outputTokens += p.outputTokens;
   }
 
   const dailyAggregates = [...dailyMap.values()]
