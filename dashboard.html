@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Code Usage Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAzMiAzMic+PHJlY3Qgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nNicgZmlsbD0nIzBmMTExNycvPjxyZWN0IHg9JzUnIHk9JzE4JyB3aWR0aD0nNScgaGVpZ2h0PSc5JyByeD0nMScgZmlsbD0nIzdlZTc4NycvPjxyZWN0IHg9JzEzJyB5PScxMicgd2lkdGg9JzUnIGhlaWdodD0nMTUnIHJ4PScxJyBmaWxsPScjNzljMGZmJy8+PHJlY3QgeD0nMjEnIHk9JzYnIHdpZHRoPSc1JyBoZWlnaHQ9JzIxJyByeD0nMScgZmlsbD0nI2QyYThmZicvPjwvc3ZnPg==">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
   <script src="./dashboard-data.js"></script>
@@ -89,107 +90,98 @@
   </style>
 </head>
 <body>
-  <!-- HEADER -->
   <h1>Claude Code Usage Dashboard</h1>
-  <div class="subtitle" id="subtitle">Laden...</div>
+  <div class="subtitle" id="subtitle">Loading...</div>
 
-  <!-- SECTIE 1: Overzicht & Plugins -->
   <div class="cards" id="cards"></div>
   <div class="chart-container" id="pluginStatus" style="margin-bottom:24px;">
-    <div class="chart-title">Actieve Plugins</div>
+    <div class="chart-title">Active Plugins</div>
     <div id="pluginContent"></div>
   </div>
 
-  <!-- SECTIE 2: Advies (bovenaan, zodat je meteen ziet wat je moet doen) -->
   <div class="chart-container" id="adviceSection">
-    <div class="chart-title">Advies & Suggesties</div>
+    <div class="chart-title">Advice & Suggestions</div>
     <div id="adviceContent" style="font-size:0.9rem;line-height:1.6;"></div>
   </div>
 
-  <!-- SECTIE 3: Voor/Na vergelijking (als er markers zijn) -->
   <div class="comparison" id="comparison">
-    <div class="chart-title">Voor/Na Plugin Vergelijking</div>
+    <div class="chart-title">Before/After Plugin Comparison</div>
     <div class="comparison-grid" id="compGrid"></div>
   </div>
 
-  <!-- SECTIE 4: Kosten & Verbruik -->
-  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Kosten & Verbruik</h2></div>
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Cost & Usage</h2></div>
   <div class="chart-row">
     <div class="chart-container">
-      <div class="chart-title">Dagelijks tokenverbruik per model</div>
-      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Absoluut totaal — afhankelijk van hoeveel je promptt die dag.</div>
+      <div class="chart-title">Daily token usage per model</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Absolute total — depends on how much you prompt that day.</div>
       <canvas id="dailyChart"></canvas>
     </div>
     <div class="chart-container">
-      <div class="chart-title">Effectieve tokens per prompt per model</div>
-      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Per model, zonder cache reads. Daling binnen zelfde kleur = echte besparing.</div>
+      <div class="chart-title">Median effective tokens per prompt per model</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Median per model, excluding cache reads. Resistant to outliers. Drop within same color = real savings.</div>
       <canvas id="avgChart"></canvas>
     </div>
   </div>
 
-  <!-- SECTIE 5: Kwaliteit & Effectiviteit -->
-  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Kwaliteit & Effectiviteit</h2></div>
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Quality & Effectiveness</h2></div>
   <div class="chart-row">
     <div class="chart-container">
       <div class="chart-title">Output per request</div>
-      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Hoeveel het model produceert per beurt. Daling na plugin = mogelijk minder nuttig.</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">How much the model produces per turn. Drop after plugin = potentially less useful.</div>
       <canvas id="outputPerRequestChart"></canvas>
     </div>
     <div class="chart-container">
       <div class="chart-title">API calls per user prompt</div>
-      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Meer calls = meer tool-gebruik of retries. Stijging na plugin = minder efficiënt.</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">More calls = more tool usage or retries. Increase after plugin = less efficient.</div>
       <canvas id="requestsPerPromptChart"></canvas>
     </div>
   </div>
 
-  <!-- SECTIE 6: Cache & Plugin-effect -->
-  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Cache & Plugin-effect</h2></div>
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Cache & Plugin Effect</h2></div>
   <div class="chart-row">
     <div class="chart-container">
-      <div class="chart-title">Cache hit ratio per dag</div>
+      <div class="chart-title">Cache hit ratio per day</div>
       <canvas id="cacheChart"></canvas>
     </div>
     <div class="chart-container">
       <div class="chart-title">Cache creation ratio per model</div>
-      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">% input dat nieuw is. Lager = plugins werken beter.</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">% of input that is new. Lower = plugins working better.</div>
       <canvas id="cacheCreationChart"></canvas>
     </div>
   </div>
 
-  <!-- SECTIE 7: Model verdeling -->
-  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Model Verdeling</h2></div>
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Model Distribution</h2></div>
   <div class="chart-row">
     <div class="chart-container">
-      <div class="chart-title">Model verdeling</div>
+      <div class="chart-title">Model distribution</div>
       <canvas id="modelChart"></canvas>
     </div>
     <div class="chart-container">
-      <div class="chart-title">Model-mix per dag</div>
-      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Controle: als model-mix verandert, kan dat token-verschil verklaren i.p.v. plugins.</div>
+      <div class="chart-title">Model mix per day</div>
+      <div class="chart-detail" style="font-size:0.8rem;color:#7d8590;margin-bottom:12px;">Control: if model mix changes, that may explain token differences instead of plugins.</div>
       <canvas id="modelMixChart"></canvas>
     </div>
   </div>
 
-  <!-- SECTIE 8: Alle prompts -->
-  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">Alle Prompts</h2></div>
+  <div style="margin-bottom:8px;margin-top:32px;"><h2 style="font-size:1.1rem;color:#7d8590;font-weight:400;">All Prompts</h2></div>
   <div class="chart-container">
     <div class="filters">
-      <label>Model: <select id="filterModel"><option value="">Alle</option></select></label>
-      <label>Van: <input type="date" id="filterFrom"></label>
-      <label>Tot: <input type="date" id="filterTo"></label>
-      <label>Zoek: <input type="text" id="filterSearch" placeholder="Zoek in prompt..."></label>
+      <label>Model: <select id="filterModel"><option value="">All</option></select></label>
+      <label>From: <input type="date" id="filterFrom"></label>
+      <label>To: <input type="date" id="filterTo"></label>
+      <label>Search: <input type="text" id="filterSearch" placeholder="Search prompts..."></label>
     </div>
     <table>
       <thead>
         <tr>
-          <th data-sort="timestamp">Datum/Tijd</th>
+          <th data-sort="timestamp">Date/Time</th>
           <th data-sort="promptPreview">Prompt</th>
           <th data-sort="model">Model</th>
           <th data-sort="inputTokens" class="token-num">Input</th>
           <th data-sort="outputTokens" class="token-num">Output</th>
           <th data-sort="cacheReadTokens" class="token-num">Cache Read</th>
           <th data-sort="cacheCreationTokens" class="token-num">Cache Create</th>
-          <th data-sort="totalTokens" class="token-num">Totaal</th>
+          <th data-sort="totalTokens" class="token-num">Total</th>
         </tr>
       </thead>
       <tbody id="promptTable"></tbody>
@@ -205,6 +197,11 @@
     let sortField = 'timestamp';
     let sortAsc = false;
 
+    function fmtDate(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
     async function loadData() {
       if (window.__DASHBOARD_DATA__) {
         data = window.__DASHBOARD_DATA__;
@@ -216,7 +213,7 @@
         data = await resp.json();
         render();
       } catch (e) {
-        document.getElementById('subtitle').textContent = 'Fout bij laden van data. Run eerst: node parse-usage.mjs';
+        document.getElementById('subtitle').textContent = 'Error loading data. Run first: node parse-usage.mjs';
       }
     }
 
@@ -247,7 +244,7 @@
     function render() {
       const gen = new Date(data.generated);
       document.getElementById('subtitle').textContent =
-        `Gegenereerd: ${gen.toLocaleString('nl-NL')} | ${data.totalPrompts} requests | ${data.totalSessions} sessies`;
+        `Generated: ${gen.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ${gen.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} | ${data.totalPrompts} requests | ${data.totalSessions} sessions`;
 
       renderCards();
       renderPlugins();
@@ -278,24 +275,24 @@
 
       document.getElementById('cards').innerHTML = `
         <div class="card">
-          <div class="card-label">Effectieve tokens/prompt</div>
+          <div class="card-label">Effective tokens/prompt</div>
           <div class="card-value">${fmt(effectivePerPrompt)}</div>
-          <div class="card-detail">Zonder cache reads — dit telt</div>
+          <div class="card-detail">Excluding cache reads — this is what counts</div>
         </div>
         <div class="card">
-          <div class="card-label">Totaal effectief</div>
+          <div class="card-label">Total effective</div>
           <div class="card-value">${fmt(effectiveTotal)}</div>
           <div class="card-detail">Input ${fmt(totalInput)} + Output ${fmt(totalOutput)} + Cache create ${fmt(totalCacheCreate)}</div>
         </div>
         <div class="card">
           <div class="card-label">Cache hit ratio</div>
           <div class="card-value">${pct(cacheRatio)}</div>
-          <div class="card-detail">Read: ${fmt(totalCacheRead)} (90% goedkoper)</div>
+          <div class="card-detail">Read: ${fmt(totalCacheRead)} (90% cheaper)</div>
         </div>
         <div class="card">
-          <div class="card-label">Totaal incl. cache</div>
+          <div class="card-label">Total incl. cache</div>
           <div class="card-value">${fmt(totalTokens)}</div>
-          <div class="card-detail">${data.totalPrompts} requests | ${data.totalSessions} sessies | ${data.dailyAggregates.length} dagen</div>
+          <div class="card-detail">${data.totalPrompts} requests | ${data.totalSessions} sessions | ${data.dailyAggregates.length} days</div>
         </div>
       `;
     }
@@ -303,7 +300,7 @@
     function renderPlugins() {
       const plugins = data.plugins || [];
       if (plugins.length === 0) {
-        document.getElementById('pluginContent').innerHTML = '<div style="color:#7d8590;font-size:0.85rem;">Geen plugins gedetecteerd. Installeer plugins om token-gebruik te optimaliseren.</div>';
+        document.getElementById('pluginContent').innerHTML = '<div style="color:#7d8590;font-size:0.85rem;">No plugins detected. Install plugins to optimize token usage.</div>';
         return;
       }
       document.getElementById('pluginContent').innerHTML = `
@@ -327,19 +324,23 @@
       data.markers.forEach((m, i) => {
         annotations[`marker${i}`] = {
           type: 'line',
-          xMin: m.date,
-          xMax: m.date,
+          xMin: fmtDate(m.date),
+          xMax: fmtDate(m.date),
           borderColor: '#f0883e',
           borderWidth: 2,
           borderDash: [6, 3],
-          label: {
-            display: true,
-            content: m.label,
-            position: 'start',
-            backgroundColor: '#f0883e',
-            color: '#fff',
-            font: { size: 11 },
-          },
+        };
+        annotations[`markerLabel${i}`] = {
+          type: 'label',
+          xValue: fmtDate(m.date),
+          yScaleID: 'y',
+          yValue: (ctx) => ctx.chart.scales.y.min,
+          content: m.label,
+          backgroundColor: 'rgba(240,136,62,0.8)',
+          color: '#fff',
+          font: { size: 9 },
+          padding: { top: 2, bottom: 2, left: 4, right: 4 },
+          position: { x: 'center', y: 'end' },
         };
       });
       return annotations;
@@ -363,7 +364,7 @@
 
       new Chart(document.getElementById('dailyChart'), {
         type: 'bar',
-        data: { labels: days.map(d => d.date), datasets },
+        data: { labels: days.map(d => fmtDate(d.date)), datasets },
         options: {
           responsive: true,
           scales: {
@@ -378,19 +379,34 @@
       });
     }
 
+    function median(arr) {
+      if (!arr.length) return null;
+      const s = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+    }
+
     function renderAvgChart() {
       const days = data.dailyAggregates;
       const allModels = [...new Set(days.flatMap(d => Object.keys(d.modelStats || {})))];
       const colors = { opus47: '#ff9ec3', opus: '#d2a8ff', sonnet: '#79c0ff', haiku: '#7ee787' };
+
+      const promptsByDayModel = {};
+      data.prompts.forEach(p => {
+        const day = p.timestamp?.slice(0, 10);
+        const key = day + '|' + p.model;
+        if (!promptsByDayModel[key]) promptsByDayModel[key] = [];
+        promptsByDayModel[key].push(p.inputTokens + p.outputTokens + p.cacheCreationTokens);
+      });
 
       const datasets = allModels.map(m => {
         const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
         return {
           label: modelShort(m),
           data: days.map(d => {
-            const ms = d.modelStats?.[m];
-            if (!ms || ms.promptCount === 0) return null;
-            return Math.round((ms.inputTokens + ms.outputTokens + ms.cacheCreationTokens) / ms.promptCount);
+            const values = promptsByDayModel[d.date + '|' + m];
+            if (!values || values.length < 3) return null;
+            return median(values);
           }),
           borderColor: colors[colorKey],
           backgroundColor: colors[colorKey] + '20',
@@ -402,7 +418,7 @@
 
       new Chart(document.getElementById('avgChart'), {
         type: 'line',
-        data: { labels: days.map(d => d.date), datasets },
+        data: { labels: days.map(d => fmtDate(d.date)), datasets },
         options: {
           responsive: true,
           scales: {
@@ -445,7 +461,7 @@
       new Chart(document.getElementById('cacheChart'), {
         type: 'line',
         data: {
-          labels: days.map(d => d.date),
+          labels: days.map(d => fmtDate(d.date)),
           datasets: [{
             label: 'Cache hit ratio',
             data: days.map(d => d.cacheHitRatio * 100),
@@ -460,45 +476,6 @@
           scales: {
             x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
             y: { min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#21262d' } },
-          },
-          plugins: {
-            legend: { labels: { color: '#e1e4e8' } },
-            annotation: { annotations: markerAnnotations() },
-          },
-        },
-      });
-    }
-
-    function renderNormalizedAvgChart() {
-      const days = data.dailyAggregates;
-      const allModels = [...new Set(days.flatMap(d => Object.keys(d.modelStats || {})))];
-      const colors = { opus47: '#ff9ec3', opus: '#d2a8ff', sonnet: '#79c0ff', haiku: '#7ee787' };
-
-      const datasets = allModels.map(m => {
-        const colorKey = m.includes('opus-4-7') ? 'opus47' : m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : 'haiku';
-        return {
-          label: modelShort(m),
-          data: days.map(d => {
-            const ms = d.modelStats?.[m];
-            if (!ms || ms.promptCount === 0) return null;
-            return Math.round((ms.inputTokens + ms.outputTokens + ms.cacheCreationTokens) / ms.promptCount);
-          }),
-          borderColor: colors[colorKey],
-          backgroundColor: colors[colorKey] + '20',
-          tension: 0.3,
-          spanGaps: true,
-          pointRadius: 4,
-        };
-      });
-
-      new Chart(document.getElementById('normalizedAvgChart'), {
-        type: 'line',
-        data: { labels: days.map(d => d.date), datasets },
-        options: {
-          responsive: true,
-          scales: {
-            x: { ticks: { color: '#7d8590' }, grid: { color: '#21262d' } },
-            y: { ticks: { color: '#7d8590', callback: v => fmt(v) }, grid: { color: '#21262d' } },
           },
           plugins: {
             legend: { labels: { color: '#e1e4e8' } },
@@ -532,7 +509,7 @@
 
       new Chart(document.getElementById('cacheCreationChart'), {
         type: 'line',
-        data: { labels: days.map(d => d.date), datasets },
+        data: { labels: days.map(d => fmtDate(d.date)), datasets },
         options: {
           responsive: true,
           scales: {
@@ -569,7 +546,7 @@
 
       new Chart(document.getElementById('modelMixChart'), {
         type: 'bar',
-        data: { labels: days.map(d => d.date), datasets },
+        data: { labels: days.map(d => fmtDate(d.date)), datasets },
         options: {
           responsive: true,
           scales: {
@@ -589,9 +566,9 @@
       new Chart(document.getElementById('outputPerRequestChart'), {
         type: 'line',
         data: {
-          labels: days.map(d => d.date),
+          labels: days.map(d => fmtDate(d.date)),
           datasets: [{
-            label: 'Gem. output tokens/request',
+            label: 'Avg output tokens/request',
             data: days.map(d => d.avgOutputPerRequest || 0),
             borderColor: '#d2a8ff',
             backgroundColor: '#d2a8ff20',
@@ -618,7 +595,7 @@
       new Chart(document.getElementById('requestsPerPromptChart'), {
         type: 'line',
         data: {
-          labels: days.map(d => d.date),
+          labels: days.map(d => fmtDate(d.date)),
           datasets: [{
             label: 'API calls per user prompt',
             data: days.map(d => d.avgRequestsPerUserPrompt || 0),
@@ -647,7 +624,6 @@
       const prompts = data.prompts;
       const advice = [];
 
-      // 1. Check if there are markers (plugins installed)
       const hasMarkers = data.markers?.length > 0;
       const marker = hasMarkers ? data.markers[0] : null;
 
@@ -660,7 +636,6 @@
         if (before.length >= 2 && after.length >= 2) {
           const eff = p => p.inputTokens + p.outputTokens + p.cacheCreationTokens;
 
-          // Per-model comparison (apples to apples)
           const modelsBefore = {};
           const modelsAfter = {};
           beforePrompts.forEach(p => {
@@ -694,42 +669,42 @@
               return { model: modelShort(m), change: +change, outChange: +outChange, countBefore: modelsBefore[m].count, countAfter: modelsAfter[m].count };
             });
 
-            const summary = perModelResults.map(r => `${r.model}: ${r.change > 0 ? '+' : ''}${r.change}% (${r.countBefore}→${r.countAfter} prompts)`).join(', ');
+            const summary = perModelResults.map(r => `${r.model}: ${r.change > 0 ? '+' : ''}${r.change}% (${r.countBefore}\u2192${r.countAfter} prompts)`).join(', ');
 
             const improving = perModelResults.filter(r => r.change < -10 && r.outChange > -5);
             const worse = perModelResults.filter(r => r.change > 10);
 
             if (improving.length > 0 && worse.length === 0) {
-              advice.push({ type: 'positive', label: 'Plugin werkt', text: `Per-model vergelijking sinds ${marker.label}: ${summary}. Besparing is echt (zelfde model, minder tokens).` });
+              advice.push({ type: 'positive', label: 'Plugin effective', text: `Per-model comparison since ${marker.label}: ${summary}. Savings are real (same model, fewer tokens).` });
             } else if (worse.length > 0 && improving.length === 0) {
-              advice.push({ type: 'warning', label: 'Plugin neutraal/negatief', text: `Per-model vergelijking (zelfde model): ${summary}. Stijging binnen hetzelfde model — plugin bespaart hier niet.` });
+              advice.push({ type: 'warning', label: 'Plugin neutral/negative', text: `Per-model comparison (same model): ${summary}. Increase within the same model \u2014 plugin is not saving here.` });
             } else if (perModelResults.every(r => Math.abs(r.change) <= 10)) {
-              advice.push({ type: 'info', label: 'Neutraal', text: `Per-model vergelijking: ${summary}. Geen significant verschil — meer data nodig of plugin heeft minimaal effect.` });
+              advice.push({ type: 'info', label: 'Neutral', text: `Per-model comparison: ${summary}. No significant difference \u2014 more data needed or plugin has minimal effect.` });
             } else {
-              advice.push({ type: 'info', label: 'Gemengd resultaat', text: `Per-model vergelijking: ${summary}. Sommige modellen besparen, andere niet.` });
+              advice.push({ type: 'info', label: 'Mixed results', text: `Per-model comparison: ${summary}. Some models save, others don't.` });
             }
           } else if (lowSampleModels.length > 0) {
             const info = lowSampleModels.map(m => {
               const b = modelsBefore[m], a = modelsAfter[m];
-              return `${modelShort(m)}: ${b.count}→${a.count} prompts`;
+              return `${modelShort(m)}: ${b.count}\u2192${a.count} prompts`;
             }).join(', ');
-            advice.push({ type: 'info', label: 'Te weinig data per model', text: `Minimaal ${MIN_SAMPLES} prompts per model nodig voor betrouwbare vergelijking. Huidige aantallen: ${info}. Blijf gebruiken en check later opnieuw.` });
+            advice.push({ type: 'info', label: 'Insufficient data per model', text: `Need at least ${MIN_SAMPLES} prompts per model for reliable comparison. Current counts: ${info}. Keep using and check again later.` });
           } else {
-            advice.push({ type: 'info', label: 'Model gewisseld', text: `Je gebruikt na ${marker.label} voornamelijk andere modellen dan ervoor. Per-model vergelijking niet mogelijk — totaalvergelijking is dan niet betrouwbaar.` });
+            advice.push({ type: 'info', label: 'Model switched', text: `You're using mostly different models after ${marker.label} than before. Per-model comparison not possible \u2014 total comparison is unreliable.` });
           }
 
           if (newModels.length > 0) {
             const newInfo = newModels.map(m => `${modelShort(m)} (${modelsAfter[m].count} prompts, ${fmt(Math.round(modelsAfter[m].eff / modelsAfter[m].count))}/prompt)`).join(', ');
-            advice.push({ type: 'info', label: 'Nieuw model', text: `Sinds ${marker.label} gebruik je ook: ${newInfo}. Dit beïnvloedt het totaalgemiddelde maar zegt niets over plugin-effectiviteit.` });
+            advice.push({ type: 'info', label: 'New model', text: `Since ${marker.label} you're also using: ${newInfo}. This affects the overall average but says nothing about plugin effectiveness.` });
           }
         } else {
-          advice.push({ type: 'info', label: 'Te weinig data', text: `Er zijn minimaal 2 dagen data nodig aan beide zijden van de markerdatum (${marker.date}). Blijf gebruiken en run het dashboard later opnieuw.` });
+          advice.push({ type: 'info', label: 'Insufficient data', text: `Need at least 2 days of data on both sides of the marker date (${marker.date}). Keep using and re-run the dashboard later.` });
         }
       } else {
-        advice.push({ type: 'info', label: 'Geen plugins gemarkeerd', text: 'Voeg een marker toe in markers.json nadat je een plugin installeert. Zonder marker kan het dashboard geen voor/na vergelijking maken.' });
+        advice.push({ type: 'info', label: 'No plugins marked', text: 'Add a marker to markers.json after installing a plugin. Without a marker the dashboard cannot make a before/after comparison.' });
       }
 
-      // 2. Model usage advice
+      // Model usage advice
       const modelTotals = {};
       prompts.forEach(p => {
         const m = modelShort(p.model);
@@ -743,11 +718,11 @@
       if (opusKey && modelTotals[opusKey]) {
         const opusPct = (modelTotals[opusKey].count / prompts.length * 100).toFixed(0);
         if (opusPct > 80) {
-          advice.push({ type: 'warning', label: 'Model-mix', text: `${opusPct}% van je requests draait op Opus (duurste model). Overweeg voor simpele taken Haiku of Sonnet te gebruiken — subagents in OMC doen dit al deels automatisch.` });
+          advice.push({ type: 'warning', label: 'Model mix', text: `${opusPct}% of your requests run on Opus (most expensive model). Consider using Haiku or Sonnet for simple tasks \u2014 OMC subagents already do this partially.` });
         }
       }
 
-      // 3. Expensive prompts detection
+      // Expensive prompts
       const sorted = [...prompts].sort((a, b) => (b.inputTokens + b.outputTokens + b.cacheCreationTokens) - (a.inputTokens + a.outputTokens + a.cacheCreationTokens));
       const top5 = sorted.slice(0, 5);
       const avgEffective = prompts.reduce((s, p) => s + p.inputTokens + p.outputTokens + p.cacheCreationTokens, 0) / prompts.length;
@@ -757,33 +732,31 @@
       if (expensiveCount > 0) {
         const topPreview = top5[0].promptPreview?.slice(0, 80) || '[system]';
         const topCost = fmt(top5[0].inputTokens + top5[0].outputTokens + top5[0].cacheCreationTokens);
-        advice.push({ type: 'warning', label: `${expensiveCount} dure prompts`, text: `${expensiveCount} prompts kosten 5x+ het gemiddelde. Duurste: "${topPreview}..." (${topCost} effectieve tokens). Scroll naar de tabel en sorteer op "Totaal" om deze te vinden.` });
+        advice.push({ type: 'warning', label: `${expensiveCount} expensive prompts`, text: `${expensiveCount} prompts cost 5x+ the average. Most expensive: "${topPreview}..." (${topCost} effective tokens). Scroll to the table and sort by "Total" to find them.` });
       }
 
-      // 4. Cache creation advice
+      // Cache creation
       const recentDays = days.slice(-3);
       const avgCacheCreate = recentDays.reduce((s, d) => s + d.cacheCreationRatio, 0) / recentDays.length;
       if (avgCacheCreate > 0.05) {
-        advice.push({ type: 'info', label: 'Cache creation hoog', text: `De laatste 3 dagen is ${(avgCacheCreate * 100).toFixed(1)}% van je input nieuw (niet uit cache). CodeSight en Context Optimizer kunnen dit verlagen door minder bestanden te lezen.` });
+        advice.push({ type: 'info', label: 'High cache creation', text: `Over the last 3 days, ${(avgCacheCreate * 100).toFixed(1)}% of your input is new (not from cache). CodeSight and Context Optimizer can reduce this by reading fewer files.` });
       } else {
-        advice.push({ type: 'positive', label: 'Cache efficiënt', text: `Slechts ${(avgCacheCreate * 100).toFixed(1)}% van je input is nieuw — je cache wordt goed hergebruikt.` });
+        advice.push({ type: 'positive', label: 'Cache efficient', text: `Only ${(avgCacheCreate * 100).toFixed(1)}% of your input is new \u2014 your cache is being reused well.` });
       }
 
-      // 5. Session length advice
+      // Session length
       if (data.sessionAggregates?.length) {
         const avgRequestsPerPrompt = data.sessionAggregates.reduce((s, sess) => s + sess.requestsPerUserPrompt, 0) / data.sessionAggregates.length;
         if (avgRequestsPerPrompt > 15) {
-          advice.push({ type: 'warning', label: 'Veel retries', text: `Gemiddeld ${avgRequestsPerPrompt.toFixed(1)} API calls per user prompt. Dit kan betekenen dat Claude veel tool calls doet. Specifiekere prompts met bestandspaden verminderen dit.` });
+          advice.push({ type: 'warning', label: 'Many retries', text: `Average ${avgRequestsPerPrompt.toFixed(1)} API calls per user prompt. This may mean Claude is making many tool calls. More specific prompts with file paths reduce this.` });
         }
       }
 
-      // 6. Auto model routing advice
+      // Auto model routing
       if (opusKey && modelTotals[opusKey]) {
         const opusCount = modelTotals[opusKey].count;
         const totalCount = prompts.length;
-        const opusPct = (opusCount / totalCount * 100).toFixed(0);
 
-        // Estimate how many Opus prompts had low output (likely simple tasks)
         const opusPrompts = prompts.filter(p => p.model?.includes('opus'));
         const lowOutputOpus = opusPrompts.filter(p => p.outputTokens < 200);
         const lowOutputPct = opusPrompts.length > 0 ? (lowOutputOpus.length / opusPrompts.length * 100).toFixed(0) : 0;
@@ -791,33 +764,31 @@
         if (lowOutputPct > 20) {
           const potentialSavings = lowOutputOpus.length;
           advice.push({ type: 'warning', label: 'Auto model routing',
-            text: `${lowOutputPct}% van je Opus-requests (${potentialSavings} calls) produceerde minder dan 200 output tokens — waarschijnlijk simpele taken die Haiku of Sonnet net zo goed kan. Overweeg auto-routing: installeer Houtini (delegeert automatisch naar goedkoper model) of bouw een PreToolUse hook die korte/simpele prompts naar Haiku stuurt. Geschatte besparing: ${potentialSavings} Opus-calls → Haiku = ~90% goedkoper per call.`
+            text: `${lowOutputPct}% of your Opus requests (${potentialSavings} calls) produced less than 200 output tokens \u2014 likely simple tasks that Haiku or Sonnet can handle equally well. Consider auto-routing: install Houtini (automatically delegates to cheaper model) or build a PreToolUse hook that routes short/simple prompts to Haiku. Estimated savings: ${potentialSavings} Opus calls \u2192 Haiku = ~90% cheaper per call.`
           });
         }
 
-        // Check for system/continuation heavy sessions (subagent overhead)
         const continuationCount = prompts.filter(p => p.promptPreview === '[system/continuation]' && p.model?.includes('opus')).length;
         const continuationPct = opusCount > 0 ? (continuationCount / opusCount * 100).toFixed(0) : 0;
         if (continuationPct > 60) {
           advice.push({ type: 'info', label: 'Subagent overhead',
-            text: `${continuationPct}% van je Opus-requests zijn system/continuation calls (tool results, thinking). Dit is normaal bij intensief tool-gebruik, maar elke call kost cache creation tokens. Kortere sessies of specifiekere prompts verminderen het aantal roundtrips.`
+            text: `${continuationPct}% of your Opus requests are system/continuation calls (tool results, thinking). This is normal with intensive tool usage, but each call costs cache creation tokens. Shorter sessions or more specific prompts reduce the number of roundtrips.`
           });
         }
       }
 
-      // 7. Prompt optimization advice
+      // Prompt optimization
       const userPrompts = prompts.filter(p => p.promptPreview !== '[system/continuation]');
       if (userPrompts.length > 50) {
         const shortPrompts = userPrompts.filter(p => (p.promptPreview?.length || 0) < 20);
         const shortPct = (shortPrompts.length / userPrompts.length * 100).toFixed(0);
         if (shortPct > 30) {
-          advice.push({ type: 'info', label: 'Prompt optimalisatie',
-            text: `${shortPct}% van je prompts is korter dan 20 tekens (bijv. "ja", "doe dit", "fix het"). Korte prompts leiden vaak tot meer tool calls omdat Claude meer moet uitzoeken. Specifiekere prompts met context en bestandspaden besparen roundtrips.`
+          advice.push({ type: 'info', label: 'Prompt optimization',
+            text: `${shortPct}% of your prompts are shorter than 20 characters (e.g. "yes", "do this", "fix it"). Short prompts often lead to more tool calls because Claude needs to figure out more. More specific prompts with context and file paths save roundtrips.`
           });
         }
       }
 
-      // Render advice
       document.getElementById('adviceContent').innerHTML = advice.map(a => `
         <div class="advice-item advice-${a.type}">
           <div class="advice-label">${a.label}</div>
@@ -836,7 +807,7 @@
       const after = data.prompts.filter(p => p.timestamp?.slice(0, 10) >= marker.date);
 
       if (!before.length || !after.length) {
-        comp.innerHTML = '<div class="chart-title">Voor/Na vergelijking</div><p style="color:#7d8590">Onvoldoende data voor vergelijking. Er is data nodig aan beide zijden van de markerdatum.</p>';
+        comp.innerHTML = '<div class="chart-title">Before/After comparison</div><p style="color:#7d8590">Insufficient data for comparison. Data is needed on both sides of the marker date.</p>';
         return;
       }
 
@@ -869,7 +840,7 @@
         return `
           <div class="comp-row">
             <div class="comp-col">
-              <div class="comp-label"><span class="model-badge ${modelClass(m)}">${modelShort(m)}</span> voor (${bm.length})</div>
+              <div class="comp-label"><span class="model-badge ${modelClass(m)}">${modelShort(m)}</span> before (${bm.length})</div>
               <div class="comp-value">${fmt(avgB)}/prompt</div>
               <div class="card-detail">Cache: ${pct(crB / (crB + ctB) || 0)}</div>
             </div>
@@ -878,7 +849,7 @@
               <div class="comp-change ${parseFloat(chg) <= 0 ? 'positive' : 'negative'}">${chg > 0 ? '+' : ''}${chg}%</div>
             </div>
             <div class="comp-col">
-              <div class="comp-label"><span class="model-badge ${modelClass(m)}">${modelShort(m)}</span> na (${am.length})</div>
+              <div class="comp-label"><span class="model-badge ${modelClass(m)}">${modelShort(m)}</span> after (${am.length})</div>
               <div class="comp-value">${fmt(avgA)}/prompt</div>
               <div class="card-detail">Cache: ${pct(crA / (crA + ctA) || 0)}</div>
             </div>
@@ -891,7 +862,7 @@
         return (bm > 0 || am > 0) && (bm < MIN_COMP || am < MIN_COMP);
       });
       const skippedNote = skippedModels.length > 0
-        ? `<div style="text-align:center;color:#7d8590;font-size:0.8rem;padding:8px 0;">${skippedModels.map(m => modelShort(m)).join(', ')}: te weinig data (min. ${MIN_COMP} prompts per kant)</div>`
+        ? `<div style="text-align:center;color:#7d8590;font-size:0.8rem;padding:8px 0;">${skippedModels.map(m => modelShort(m)).join(', ')}: insufficient data (min. ${MIN_COMP} prompts per side)</div>`
         : '';
 
       const modelMixChanged = allModels.some(m => {
@@ -900,13 +871,13 @@
         return inBefore !== inAfter;
       });
       const totalNote = modelMixChanged
-        ? '<div style="text-align:center;color:#7d8590;font-size:0.75rem;margin-top:4px;">Model-mix is veranderd — totaal is indicatief, per-model vergelijking is betrouwbaarder.</div>'
+        ? '<div style="text-align:center;color:#7d8590;font-size:0.75rem;margin-top:4px;">Model mix has changed \u2014 total is indicative, per-model comparison is more reliable.</div>'
         : '';
 
       document.getElementById('compGrid').innerHTML = `
         <div class="comp-row">
           <div class="comp-col">
-            <div class="comp-label">Totaal voor (${before.length} prompts)</div>
+            <div class="comp-label">Total before (${before.length} prompts)</div>
             <div class="comp-value">${fmt(avgBefore)}/prompt</div>
             <div class="card-detail">Cache ratio: ${pct(ratioBefore)}</div>
           </div>
@@ -915,7 +886,7 @@
             <div class="comp-change ${parseFloat(changePct) <= 0 ? 'positive' : 'negative'}">${changePct > 0 ? '+' : ''}${changePct}%</div>
           </div>
           <div class="comp-col">
-            <div class="comp-label">Totaal na (${after.length} prompts)</div>
+            <div class="comp-label">Total after (${after.length} prompts)</div>
             <div class="comp-value">${fmt(avgAfter)}/prompt</div>
             <div class="card-detail">Cache ratio: ${pct(ratioAfter)}</div>
           </div>
@@ -995,16 +966,18 @@
       tbody.innerHTML = page.map(p => {
         const eff = p.inputTokens + p.outputTokens + p.cacheCreationTokens;
         const isExpensive = eff > expThreshold;
+        const d = new Date(p.timestamp);
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
         return `
         <tr style="${isExpensive ? 'background:#1f0d0d;' : ''}">
-          <td>${new Date(p.timestamp).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+          <td>${dateStr}</td>
           <td class="prompt-text" title="${(p.promptPreview || '').replace(/"/g, '&quot;')}">${p.promptPreview || '-'}</td>
           <td><span class="model-badge ${modelClass(p.model)}">${modelShort(p.model)}</span></td>
           <td class="token-num">${fmt(p.inputTokens)}</td>
           <td class="token-num">${fmt(p.outputTokens)}</td>
           <td class="token-num">${fmt(p.cacheReadTokens)}</td>
           <td class="token-num">${fmt(p.cacheCreationTokens)}</td>
-          <td class="token-num"><strong>${fmt(p.totalTokens)}</strong>${isExpensive ? ' <span style="color:#f85149;font-size:0.7rem;">DUUR</span>' : ''}</td>
+          <td class="token-num"><strong>${fmt(p.totalTokens)}</strong>${isExpensive ? ' <span style="color:#f85149;font-size:0.7rem;">EXPENSIVE</span>' : ''}</td>
         </tr>`;
       }).join('');
 
@@ -1012,7 +985,7 @@
       document.getElementById('pagination').innerHTML = `
         <button ${currentPage === 0 ? 'disabled' : ''} onclick="currentPage=0;renderTable();">\u00AB</button>
         <button ${currentPage === 0 ? 'disabled' : ''} onclick="currentPage--;renderTable();">\u2039</button>
-        <span class="page-info">${start + 1}\u2013${Math.min(start + PAGE_SIZE, filteredPrompts.length)} van ${filteredPrompts.length}</span>
+        <span class="page-info">${start + 1}\u2013${Math.min(start + PAGE_SIZE, filteredPrompts.length)} of ${filteredPrompts.length}</span>
         <button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="currentPage++;renderTable();">\u203A</button>
         <button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="currentPage=totalPages-1;renderTable();">\u00BB</button>
       `;
