@@ -18,8 +18,6 @@ Visual dashboard for tracking Claude Code token usage with per-prompt granularit
 
 ![Quality & cache charts](screenshots/quality-cache-v2.png)
 
-![Prompt table](screenshots/table-v2.png)
-
 ## Quick start
 
 ```bash
