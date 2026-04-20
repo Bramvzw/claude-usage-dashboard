@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { execSync, exec } from 'node:child_process';
-import { existsSync, copyFileSync, mkdirSync } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
+import { existsSync, copyFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir, tmpdir } from 'node:os';
@@ -17,7 +17,8 @@ if (!existsSync(claudeDir)) {
 }
 
 const outDir = join(tmpdir(), 'claude-usage-dashboard');
-mkdirSync(outDir, { recursive: true });
+mkdirSync(outDir, { recursive: true, mode: 0o700 });
+chmodSync(outDir, 0o700);
 
 copyFileSync(join(packageRoot, 'dashboard.html'), join(outDir, 'dashboard.html'));
 
@@ -39,7 +40,7 @@ function open(url) {
   const cmd = process.platform === 'darwin' ? 'open'
     : process.platform === 'win32' ? 'start'
     : 'xdg-open';
-  exec(`${cmd} "${url}"`);
+  spawn(cmd, [url], { stdio: 'ignore', detached: true }).unref();
 }
 
 open(dashboardPath);

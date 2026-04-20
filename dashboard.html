@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Claude Code Usage Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAzMiAzMic+PHJlY3Qgd2lkdGg9JzMyJyBoZWlnaHQ9JzMyJyByeD0nNicgZmlsbD0nIzBmMTExNycvPjxyZWN0IHg9JzUnIHk9JzE4JyB3aWR0aD0nNScgaGVpZ2h0PSc5JyByeD0nMScgZmlsbD0nIzdlZTc4NycvPjxyZWN0IHg9JzEzJyB5PScxMicgd2lkdGg9JzUnIGhlaWdodD0nMTUnIHJ4PScxJyBmaWxsPScjNzljMGZmJy8+PHJlY3QgeD0nMjEnIHk9JzYnIHdpZHRoPSc1JyBoZWlnaHQ9JzIxJyByeD0nMScgZmlsbD0nI2QyYThmZicvPjwvc3ZnPg==">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"
+          integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"
+          integrity="sha384-3N9GHhCtN3CQef6tNfqgZlv7sQLYIkcChN+uaTZ7xVdzKYp/SjBNPxa92+hM7EAY"
+          crossorigin="anonymous"></script>
   <script src="./dashboard-data.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -687,7 +692,7 @@
             const worse = perModelResults.filter(r => r.change > 10);
 
             if (improving.length > 0 && worse.length === 0) {
-              advice.push({ type: 'positive', label: 'Plugin effective', text: `Per-model comparison since ${marker.label}: ${summary}. Savings are real (same model, fewer tokens).` });
+              advice.push({ type: 'positive', label: 'Plugin effective', text: `Per-model comparison since ${esc(marker.label)}: ${summary}. Savings are real (same model, fewer tokens).` });
             } else if (worse.length > 0 && improving.length === 0) {
               advice.push({ type: 'warning', label: 'Plugin neutral/negative', text: `Per-model comparison (same model): ${summary}. Increase within the same model \u2014 plugin is not saving here.` });
             } else if (perModelResults.every(r => Math.abs(r.change) <= 10)) {
@@ -702,12 +707,12 @@
             }).join(', ');
             advice.push({ type: 'info', label: 'Insufficient data per model', text: `Need at least ${MIN_SAMPLES} prompts per model for reliable comparison. Current counts: ${info}. Keep using and check again later.` });
           } else {
-            advice.push({ type: 'info', label: 'Model switched', text: `You're using mostly different models after ${marker.label} than before. Per-model comparison not possible \u2014 total comparison is unreliable.` });
+            advice.push({ type: 'info', label: 'Model switched', text: `You're using mostly different models after ${esc(marker.label)} than before. Per-model comparison not possible \u2014 total comparison is unreliable.` });
           }
 
           if (newModels.length > 0) {
             const newInfo = newModels.map(m => `${modelShort(m)} (${modelsAfter[m].count} prompts, ${fmt(Math.round(modelsAfter[m].eff / modelsAfter[m].count))}/prompt)`).join(', ');
-            advice.push({ type: 'info', label: 'New model', text: `Since ${marker.label} you're also using: ${newInfo}. This affects the overall average but says nothing about plugin effectiveness.` });
+            advice.push({ type: 'info', label: 'New model', text: `Since ${esc(marker.label)} you're also using: ${newInfo}. This affects the overall average but says nothing about plugin effectiveness.` });
           }
         } else {
           advice.push({ type: 'info', label: 'Insufficient data', text: `Need at least 2 days of data on both sides of the marker date (${marker.date}). Keep using and re-run the dashboard later.` });
@@ -744,7 +749,7 @@
       if (expensiveCount > 0) {
         const topPreview = top5[0].promptPreview?.slice(0, 80) || '[system]';
         const topCost = fmt(top5[0].inputTokens + top5[0].outputTokens + top5[0].cacheCreationTokens);
-        advice.push({ type: 'warning', label: `${expensiveCount} expensive prompts`, text: `${expensiveCount} prompts cost 5x+ the average. Most expensive: "${topPreview}..." (${topCost} effective tokens). Scroll to the table and sort by "Total" to find them.` });
+        advice.push({ type: 'warning', label: `${expensiveCount} expensive prompts`, text: `${expensiveCount} prompts cost 5x+ the average. Most expensive: "${esc(topPreview)}..." (${topCost} effective tokens). Scroll to the table and sort by "Total" to find them.` });
       }
 
       // Cache creation
@@ -802,8 +807,8 @@
       }
 
       document.getElementById('adviceContent').innerHTML = advice.map(a => `
-        <div class="advice-item advice-${a.type}">
-          <div class="advice-label">${a.label}</div>
+        <div class="advice-item advice-${esc(a.type)}">
+          <div class="advice-label">${esc(a.label)}</div>
           <div>${a.text}</div>
         </div>
       `).join('');

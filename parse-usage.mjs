@@ -375,8 +375,8 @@ async function main() {
 
   const jsonPath = join(OUTPUT_DIR, 'dashboard-data.json');
   const jsPath = join(OUTPUT_DIR, 'dashboard-data.js');
-  writeFileSync(jsonPath, JSON.stringify(output, null, 2));
-  writeFileSync(jsPath, `window.__DASHBOARD_DATA__ = ${JSON.stringify(output)};\n`);
+  writeFileSync(jsonPath, JSON.stringify(output, null, 2), { mode: 0o600 });
+  writeFileSync(jsPath, `window.__DASHBOARD_DATA__ = ${JSON.stringify(output)};\n`, { mode: 0o600 });
   console.log(`Dashboard data written to ${jsonPath}`);
   console.log(`  ${allPrompts.length} prompts across ${dailyAggregates.length} days`);
   console.log(`  ${sessionSet.size} unique sessions`);
