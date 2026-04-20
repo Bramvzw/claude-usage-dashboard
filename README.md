@@ -7,7 +7,7 @@ Visual dashboard for tracking Claude Code token usage with per-prompt granularit
 ## Quick start
 
 ```bash
-npx claude-usage-dashboard
+npx github:Bramvzw/claude-usage-dashboard
 ```
 
 Or clone the repo:
