@@ -1,3 +1,7 @@
 dashboard-data.json
 dashboard-data.js
 markers.json
+node_modules/
+screenshots/frame*
+screenshots/frames.txt
+screenshots/demo-overview*

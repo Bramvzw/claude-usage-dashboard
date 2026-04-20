@@ -1,0 +1,32 @@
+{
+  "name": "claude-usage-dashboard",
+  "version": "1.0.0",
+  "description": "Visual dashboard for tracking Claude Code token usage with per-prompt granularity",
+  "type": "module",
+  "bin": {
+    "claude-usage-dashboard": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "parse-usage.mjs",
+    "dashboard.html",
+    "markers.example.json"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "token-usage",
+    "dashboard",
+    "developer-tools"
+  ],
+  "author": "Bramvzw",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bramvzw/claude-usage-dashboard.git"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -2,7 +2,23 @@
 
 Visual dashboard for tracking Claude Code token usage with per-prompt granularity, plugin effectiveness tracking, and optimization advice.
 
-![Dashboard overview](screenshots/overview-v2.png)
+![Dashboard demo](screenshots/demo.gif)
+
+## Quick start
+
+```bash
+npx claude-usage-dashboard
+```
+
+Or clone the repo:
+
+```bash
+git clone https://github.com/Bramvzw/claude-usage-dashboard.git
+cd claude-usage-dashboard
+./run-dashboard.sh
+```
+
+This parses your `~/.claude/projects/` JSONL files and opens the dashboard in your browser.
 
 ## Features
 
@@ -15,30 +31,6 @@ Visual dashboard for tracking Claude Code token usage with per-prompt granularit
 - **Automatic advice** — model routing suggestions, expensive prompt detection, cache efficiency tips
 - **Filterable prompt table** — filter by model, date range, search term
 - **Expensive prompt highlighting** — flagged prompts costing 5x+ the average
-
-![Quality & cache charts](screenshots/quality-cache-v2.png)
-
-## Quick start
-
-```bash
-git clone <this-repo>
-cd claude-usage-dashboard
-chmod +x run-dashboard.sh
-./run-dashboard.sh
-```
-
-This will parse your `~/.claude/projects/` JSONL files and open the dashboard in your browser.
-
-## Usage
-
-```bash
-# Generate data and open dashboard
-./run-dashboard.sh
-
-# Or separately:
-node parse-usage.mjs    # Parse JSONL files → dashboard-data.js
-open dashboard.html     # Open in browser
-```
 
 ## Plugin markers
 
