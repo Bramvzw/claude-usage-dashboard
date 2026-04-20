@@ -2,7 +2,7 @@
 
 Visual dashboard for tracking Claude Code token usage with per-prompt granularity, plugin effectiveness tracking, and optimization advice.
 
-![Dashboard overview](screenshots/overview.png)
+![Dashboard overview](screenshots/overview-v2.png)
 
 ## Features
 
@@ -16,9 +16,9 @@ Visual dashboard for tracking Claude Code token usage with per-prompt granularit
 - **Filterable prompt table** — filter by model, date range, search term
 - **Expensive prompt highlighting** — flagged prompts costing 5x+ the average
 
-![Quality & cache charts](screenshots/quality-cache.png)
+![Quality & cache charts](screenshots/quality-cache-v2.png)
 
-![Prompt table](screenshots/table.png)
+![Prompt table](screenshots/table-v2.png)
 
 ## Quick start
 
